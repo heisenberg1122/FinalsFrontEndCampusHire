@@ -11,7 +11,7 @@ const { width, height } = Dimensions.get('window');
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState('Candidate');
+  // REMOVED: activeTab state
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -33,13 +33,8 @@ const LoginScreen = ({ navigation }) => {
       const response = await axios.post(`${API_URL}/api/login/`, { email, password });
       const user = response.data.user;
 
-      if (activeTab === 'Admin' && user.role !== 'Admin') {
-        const msg = "Access Denied: This login is for HR Admins only.";
-        Platform.OS === 'web' ? alert(msg) : Alert.alert("Access Denied", msg);
-        setLoading(false);
-        return;
-      }
-
+      // REMOVED: The manual check against activeTab.
+      // LOGIC: Automatically redirect based on the role returned by the database.
       if (user.role === 'Admin') {
         navigation.replace('AdminDashboard', { user });
       } else {
@@ -68,29 +63,11 @@ const LoginScreen = ({ navigation }) => {
             
             {/* Header */}
             <View style={styles.headerContainer}>
-              <Text style={styles.welcomeText}>Welcome Back!</Text>
-              <Text style={styles.subtitleText}>Sign in to your {activeTab} portal</Text>
+              <Text style={styles.welcomeText}>Welcome to Campus Hire</Text>
+              <Text style={styles.subtitleText}>Sign in to your account</Text>
             </View>
 
-            {/* Toggle Tabs */}
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === 'Candidate' && styles.activeTab]}
-                onPress={() => setActiveTab('Candidate')}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="person" size={16} color={activeTab === 'Candidate' ? 'white' : '#666'} style={{marginRight: 8}} />
-                <Text style={[styles.tabText, activeTab === 'Candidate' && styles.activeTabText]}>Candidate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === 'Admin' && styles.activeTab]}
-                onPress={() => setActiveTab('Admin')}
-                activeOpacity={0.8}
-              >
-                 <Ionicons name="briefcase" size={16} color={activeTab === 'Admin' ? 'white' : '#666'} style={{marginRight: 8}} />
-                <Text style={[styles.tabText, activeTab === 'Admin' && styles.activeTabText]}>HR Admin</Text>
-              </TouchableOpacity>
-            </View>
+            {/* REMOVED: Tab Container (Candidate/HR Switch) */}
 
             {/* Input Fields */}
             <View style={styles.inputContainer}>
@@ -127,7 +104,7 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Create Account Link */}
             <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={styles.signupLinkContainer}>
-               <Text style={styles.linkText}>Don't have an account? <Text style={styles.linkHighlight}>Create Now</Text></Text>
+                <Text style={styles.linkText}>Don't have an account? <Text style={styles.linkHighlight}>Create Now</Text></Text>
             </TouchableOpacity>
 
           </View>
@@ -149,11 +126,9 @@ const styles = StyleSheet.create({
   headerContainer: { marginBottom: 30, alignItems: 'center' },
   welcomeText: { fontSize: 28, fontWeight: '800', color: '#1a1a1a', marginBottom: 8 },
   subtitleText: { fontSize: 16, color: '#666', fontWeight: '500' },
-  tabContainer: { flexDirection: 'row', marginBottom: 30, backgroundColor: '#f0f2f5', borderRadius: 50, padding: 4 },
-  tab: { flex: 1, flexDirection: 'row', paddingVertical: 12, justifyContent: 'center', alignItems: 'center', borderRadius: 50 },
-  activeTab: { backgroundColor: '#0d6efd', shadowColor: '#0d6efd', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 3 },
-  tabText: { color: '#666', fontWeight: '600', fontSize: 15 },
-  activeTabText: { color: 'white' },
+  
+  // REMOVED: Tab specific styles
+
   inputContainer: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 15,
     marginBottom: 15, paddingHorizontal: 15, borderWidth: 1, borderColor: '#e1e5e9', height: 55,

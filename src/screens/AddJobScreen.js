@@ -14,26 +14,58 @@ const AddJobScreen = ({ navigation }) => {
   const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
 
   const handleSubmit = async () => {
+    // 1. Basic Validation
     if(!title || !position || !description || !salary || !slots) {
         Alert.alert("Error", "Please fill all fields");
         return;
     }
 
+    // 2. Number Validation
+    const salaryNum = parseFloat(salary);
+    const slotsNum = parseInt(slots);
+
+    if (isNaN(salaryNum) || isNaN(slotsNum)) {
+        Alert.alert("Error", "Salary and Slots must be valid numbers.");
+        return;
+    }
+
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/jobs/`, {
+      const payload = {
         title,
-        job_position: position,
+        job_position: position, // Must match Django Model field name
         description,
-        salary: parseFloat(salary), // Fix: Send number
-        slots: parseInt(slots),     // Fix: Send number
+        salary: salaryNum,
+        slots: slotsNum,
         status: 'Open'
-      });
+      };
+      
+      console.log("Sending Payload:", payload); // Debugging: See what you are sending
+
+      await axios.post(`${API_URL}/api/jobs/`, payload);
       
       Alert.alert("Success", "Job Posted!", [{ text: "OK", onPress: () => navigation.goBack() }]);
+    
     } catch (error) {
       console.log(error);
-      Alert.alert("Error", "Failed to post job. Check inputs.");
+      
+      // --- IMPROVED ERROR HANDLING ---
+      // This will now show you exactly what Django is complaining about
+      let errorMessage = "Failed to post job.";
+      
+      if (error.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          console.log("Server Error Data:", error.response.data);
+          
+          // Convert the error object (e.g., {salary: ["Invalid number"]}) to a string
+          errorMessage = JSON.stringify(error.response.data);
+      } else if (error.request) {
+          // The request was made but no response was received
+          errorMessage = "Network error. Is the backend running?";
+      }
+
+      Alert.alert("Submission Error", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -49,16 +81,28 @@ const AddJobScreen = ({ navigation }) => {
       </View>
       
       <Text style={styles.label}>Job Title</Text>
-      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" />
+      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Software Engineer" />
 
       <Text style={styles.label}>Position</Text>
-      <TextInput style={styles.input} value={position} onChangeText={setPosition} placeholder="Position" />
+      <TextInput style={styles.input} value={position} onChangeText={setPosition} placeholder="e.g. Junior Dev" />
 
       <Text style={styles.label}>Salary</Text>
-      <TextInput style={styles.input} value={salary} onChangeText={setSalary} keyboardType="numeric" placeholder="0.00" />
+      <TextInput 
+        style={styles.input} 
+        value={salary} 
+        onChangeText={setSalary} 
+        keyboardType="numeric" 
+        placeholder="0.00" 
+      />
 
       <Text style={styles.label}>Slots</Text>
-      <TextInput style={styles.input} value={slots} onChangeText={setSlots} keyboardType="numeric" placeholder="0" />
+      <TextInput 
+        style={styles.input} 
+        value={slots} 
+        onChangeText={setSlots} 
+        keyboardType="numeric" 
+        placeholder="e.g. 5" 
+      />
 
       <Text style={styles.label}>Description</Text>
       <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} multiline />

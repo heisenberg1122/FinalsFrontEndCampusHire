@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native'; // <--- IMPORT THIS
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,12 +24,19 @@ const JobPostings = ({ navigation }) => {
     }
   };
 
-  useEffect(() => { fetchJobs(); }, []);
+  // 🔄 CRITICAL UPDATE: useFocusEffect
+  // This ensures the list reloads whenever you navigate back to this screen
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobs();
+    }, [])
+  );
+
   const onRefresh = () => { setRefreshing(true); fetchJobs(); };
 
   // --- DELETE FUNCTION ---
   const handleDelete = (id) => {
-    Alert.alert("Confirm Delete", "Are you sure?", [
+    Alert.alert("Confirm Delete", "Are you sure you want to remove this job?", [
       { text: "Cancel", style: "cancel" },
       { 
         text: "Delete", 
@@ -36,8 +44,11 @@ const JobPostings = ({ navigation }) => {
         onPress: async () => {
           try {
             await axios.delete(`${API_URL}/api/jobs/${id}/`);
-            fetchJobs(); // Refresh list immediately
+            // Remove from list immediately (UI optimizaton)
+            setJobs(currentJobs => currentJobs.filter(job => job.id !== id));
+            Alert.alert("Success", "Job deleted successfully");
           } catch (error) {
+            console.log(error);
             Alert.alert("Error", "Could not delete job.");
           }
         }
@@ -54,6 +65,7 @@ const JobPostings = ({ navigation }) => {
         <View style={styles.cardHeaderTop}>
             <View style={{flex: 1, marginRight: 10}}>
                 <Text style={styles.jobTitle}>{item.title}</Text>
+                {/* Ensure backend field name matches here */}
                 <Text style={styles.jobPosition}>{item.job_position}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: isOpen ? '#d1e7dd' : '#f8d7da' }]}>
@@ -121,6 +133,11 @@ const JobPostings = ({ navigation }) => {
           renderItem={renderJobItem}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0d6efd']} />}
+          ListEmptyComponent={
+            <View style={styles.centerLoading}>
+                <Text style={{color: '#888', marginTop: 20}}>No jobs found. Post one!</Text>
+            </View>
+          }
         />
       )}
     </View>
