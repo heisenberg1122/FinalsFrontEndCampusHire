@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Platform, ImageBackground, Dimensions, StatusBar } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native'; // <--- CRITICAL IMPORT
 import axios from 'axios';
@@ -19,6 +19,8 @@ const AdminDashboard = ({ navigation, route }) => {
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [interviews, setInterviews] = useState([]);
+  const [loadingInterviews, setLoadingInterviews] = useState(true);
 
   // 🌐 AUTO-DETECT URL
   const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
@@ -40,15 +42,63 @@ const AdminDashboard = ({ navigation, route }) => {
     }
   };
 
+  // --- FETCH UPCOMING INTERVIEWS ---
+  const fetchInterviews = async () => {
+    try {
+      setLoadingInterviews(true);
+      const res = await axios.get(`${API_URL}/job/api/interviews/`);
+      if (Array.isArray(res.data)) {
+        setInterviews(res.data);
+      } else {
+        setInterviews([]);
+      }
+    } catch (err) {
+      console.log('Failed to fetch interviews', err);
+      setInterviews([]);
+    } finally {
+      setLoadingInterviews(false);
+    }
+  };
+
   // --- 🔄 AUTO-REFRESH LOGIC ---
   // This runs every time the screen comes into focus
+  const pollRef = useRef(null);
+
   useFocusEffect(
     useCallback(() => {
+      // initial load
       fetchStats();
+      fetchInterviews();
+
+      // start polling every 10s while focused
+      pollRef.current = setInterval(() => {
+        fetchInterviews();
+      }, 10000);
+
+      return () => {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      };
     }, [])
   );
 
-  const onRefresh = () => { setRefreshing(true); fetchStats(); };
+  const onRefresh = () => { setRefreshing(true); fetchStats(); fetchInterviews(); };
+
+  // If a new interview was passed via navigation params, prepend it to the list so it shows immediately
+  useEffect(() => {
+    if (route?.params?.newInterview) {
+      setInterviews(prev => {
+        // Avoid duplicate if already present
+        const exists = prev.some(i => i.id === route.params.newInterview.id);
+        if (exists) return prev;
+        return [route.params.newInterview, ...prev];
+      });
+      // clear the param to avoid repeated inserts
+      try { route.params.newInterview = null; } catch (e) {}
+    }
+  }, [route?.params?.newInterview]);
 
   // --- STAT CARD COMPONENT ---
   const DashboardCard = ({ title, count, iconName, onPress, color }) => (
@@ -151,16 +201,33 @@ const AdminDashboard = ({ navigation, route }) => {
 
             <View style={styles.divider} />
 
-            {/* Recent Activity / Placeholder */}
+            {/* Recent Activity / Interviews */}
             <View style={styles.interviewHeader}>
                 <Text style={styles.sectionTitle}>Interview Schedule</Text>
-                <TouchableOpacity><Text style={styles.linkText}>View All</Text></TouchableOpacity>
+                <View style={{flexDirection:'row', alignItems:'center'}}>
+                  <View style={styles.liveBadge} />
+                  <TouchableOpacity onPress={() => navigation.navigate('ViewApplications')}><Text style={styles.linkText}>View All</Text></TouchableOpacity>
+                </View>
             </View>
-            
-            <View style={styles.emptyState}>
+
+            {loadingInterviews ? (
+              <ActivityIndicator size="small" color="#0d6efd" />
+            ) : interviews.length === 0 ? (
+              <View style={styles.emptyState}>
                 <Ionicons name="calendar-outline" size={40} color="#ddd" />
-                <Text style={styles.emptyText}>No interviews scheduled today.</Text>
-            </View>
+                <Text style={styles.emptyText}>No interviews scheduled.</Text>
+              </View>
+            ) : (
+              <View>
+                {interviews.slice(0,3).map((iv) => (
+                  <TouchableOpacity key={iv.id} style={styles.interviewCard} onPress={() => navigation.navigate('ViewApplications')}>
+                    <Text style={{fontWeight:'700'}}>{iv.job_title || 'Unknown Position'}</Text>
+                    <Text style={{color:'#666', marginTop:4}}>{iv.applicant_name}</Text>
+                    <Text style={{color:'#888', marginTop:6}}>{new Date(iv.date_time).toLocaleString()} • {iv.location}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
           </View>
         </ScrollView>
@@ -231,6 +298,10 @@ const styles = StyleSheet.create({
     borderRadius: 15, borderWidth: 1, borderColor: '#e9ecef', borderStyle: 'dashed' 
   },
   emptyText: { color: '#999', marginTop: 10, fontSize: 14 }
+  ,
+  interviewCard: { padding: 12, backgroundColor: '#fff', borderRadius: 12, marginBottom: 10, borderWidth:1, borderColor:'#eef2f6' }
+  ,
+  liveBadge: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#28a745', marginRight: 8, marginTop: 2 }
 });
 
 export default AdminDashboard;

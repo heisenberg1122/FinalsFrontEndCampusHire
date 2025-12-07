@@ -6,7 +6,8 @@ import {
     TouchableOpacity, 
     StyleSheet, 
     Alert, 
-    ActivityIndicator 
+    ActivityIndicator,
+    Platform
 } from 'react-native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +21,9 @@ const ScheduleInterview = ({ route, navigation }) => {
     const [location, setLocation] = useState('Online');
     const [loading, setLoading] = useState(false);
 
-    // Replace with your IP
-    const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000/job/api/interviews/create/' : 'http://10.0.2.2:8000/job/api/interviews/create/';
+    // API root auto-detect
+    const API_ROOT = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
+    const API_URL = `${API_ROOT}/job/api/interviews/create/`;
 
     const handleSubmit = async () => {
         if (!date || !time || !location) {
@@ -31,16 +33,27 @@ const ScheduleInterview = ({ route, navigation }) => {
 
         setLoading(true);
         try {
-            await axios.post(API_URL, {
-                application_id: applicationId,
-                date: date,
-                time: time,
-                location: location
-            });
+                const res = await axios.post(API_URL, {
+                    application_id: applicationId,
+                    date: date,
+                    time: time,
+                    location: location
+                }, {
+                    validateStatus: () => true
+                });
 
-            Alert.alert("Success", "Interview Scheduled!", [
-                { text: "OK", onPress: () => navigation.navigate("PendingTasks") }
-            ]);
+                console.log('Attempt POST to:', API_URL);
+                console.log('Response status:', res.status, 'data:', res.data);
+
+                if (res.status >= 200 && res.status < 300) {
+                    const interview = res.data;
+                    Alert.alert("Success", "Interview Scheduled!", [
+                        { text: "OK", onPress: () => navigation.navigate("AdminDashboard", { newInterview: interview }) }
+                    ]);
+                } else {
+                    const msg = res.data?.error || res.data?.message || JSON.stringify(res.data);
+                    Alert.alert("Server Error", `Status: ${res.status}\nMessage: ${msg}`);
+                }
         } catch (error) {
             console.error(error);
             Alert.alert("Error", "Failed to schedule interview.");

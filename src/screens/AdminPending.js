@@ -55,20 +55,29 @@ const AdminPending = ({ navigation }) => {
   console.log(`Payload: { action: '${actionType}' }`);
 
   try {
-    // 1. Send POST request
+    // 1. Send POST request -- allow axios to return non-2xx so we can handle 403 body
     const response = await axios.post(targetUrl, {
       action: actionType // sends 'accept' or 'reject'
+    }, {
+      // prevent axios from throwing on non-2xx so we can inspect response body (helpful for debugging 403)
+      validateStatus: () => true
     });
 
-    console.log("Response Success:", response.data);
+    console.log("Review response status:", response.status);
+    console.log("Review response data:", response.data);
 
-    // 2. Success Feedback
-    const statusText = actionType === 'accept' ? "Accepted" : "Rejected";
-    Alert.alert("Success", `Application has been ${statusText}.`);
-        
-    // 3. Close Modal & Remove from List
-    setModalVisible(false);
-    setPendingApps(prevApps => prevApps.filter(app => app.id !== applicationId));
+    if (response.status >= 200 && response.status < 300) {
+      // 2. Success Feedback
+      const statusText = actionType === 'accept' ? "Accepted" : "Rejected";
+      Alert.alert("Success", `Application has been ${statusText}.`);
+      // 3. Close Modal & Remove from List
+      setModalVisible(false);
+      setPendingApps(prevApps => prevApps.filter(app => app.id !== applicationId));
+    } else {
+      // Not a success status -- show server message if present
+      const msg = response.data?.error || response.data?.message || JSON.stringify(response.data);
+      Alert.alert("Server Error", `Status: ${response.status}\nMessage: ${msg}`);
+    }
 
   } catch (error) {
     console.error("Review failed full error:", error);
@@ -97,11 +106,31 @@ const AdminPending = ({ navigation }) => {
   // --- ACTION HANDLERS ---
 
   const handleOpenResume = (url) => {
-    if (url) {
-      Linking.openURL(url).catch(err => Alert.alert("Error", "Cannot open resume link."));
-    } else {
+    if (!url) {
       Alert.alert("No Resume", "This applicant did not upload a resume.");
+      return;
     }
+
+    // If the resume URL is relative (doesn't start with http), prefix API host
+    let finalUrl = url;
+    if (!/^https?:\/\//i.test(url)) {
+      // Ensure API_URL doesn't end with a slash
+      const base = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+      // Ensure url starts with '/'
+      const path = url.startsWith('/') ? url : '/' + url;
+      finalUrl = `${base}${path}`;
+    }
+
+    Linking.canOpenURL(finalUrl).then((supported) => {
+      if (supported) {
+        Linking.openURL(finalUrl).catch(err => Alert.alert("Error", "Cannot open resume link."));
+      } else {
+        Alert.alert("Error", "Cannot open resume link.");
+      }
+    }).catch(err => {
+      console.log('canOpenURL error', err);
+      Alert.alert('Error', 'Cannot open resume link.');
+    });
   };
 
   // Handles confirmation before calling API

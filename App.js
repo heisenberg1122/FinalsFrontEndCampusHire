@@ -15,6 +15,8 @@ import ViewApplications from './src/screens/ViewApplications';
 import ApplyJobScreen from './src/screens/ApplyJobScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminPending from './src/screens/AdminPending';
+import ScheduleInterview from './src/screens/ScheduleInterview';
+import Notifications from './src/screens/Notifications';
 
 const Stack = createStackNavigator();
 
@@ -37,6 +39,8 @@ export default function App() {
         <Stack.Screen name="ApplyJob" component={ApplyJobScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="AdminPending" component={AdminPending} />
+        <Stack.Screen name="ScheduleInterview" component={ScheduleInterview} />
+        <Stack.Screen name="Notifications" component={Notifications} />
       </Stack.Navigator>
     </NavigationContainer>
   );

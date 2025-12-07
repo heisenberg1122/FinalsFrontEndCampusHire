@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert, ImageBackground, Dimensions, StatusBar, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert, ImageBackground, Dimensions, StatusBar, RefreshControl, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,18 +79,25 @@ const ViewApplications = ({ navigation }) => {
 
         {/* Action Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity 
-            style={[styles.btn, styles.resumeBtn]} 
-            onPress={() => Alert.alert("Resume", "Downloading resume...")}
-            activeOpacity={0.8}
-          >
-              <Ionicons name="document-text" size={16} color="white" />
-              <Text style={styles.btnText}>Resume</Text>
-          </TouchableOpacity>
-          
+          {item.resume ? (
+            <TouchableOpacity 
+              style={[styles.btn, styles.resumeBtn]} 
+              onPress={() => handleOpenResume(item.resume)}
+              activeOpacity={0.8}
+            >
+                <Ionicons name="document-text" size={16} color="white" />
+                <Text style={styles.btnText}>Resume</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.btn, styles.resumeBtn, styles.noResumeBtn]}>
+                <Ionicons name="close-circle" size={16} color="white" />
+                <Text style={styles.btnText}>No Resume</Text>
+            </View>
+          )}
+
           <TouchableOpacity 
             style={[styles.btn, styles.scheduleBtn]} 
-            onPress={() => Alert.alert("Schedule", "Opening Interview Scheduler...")}
+            onPress={() => handleSchedule(item)}
             activeOpacity={0.8}
           >
               <Ionicons name="calendar" size={16} color="white" />
@@ -99,6 +106,39 @@ const ViewApplications = ({ navigation }) => {
         </View>
       </View>
     );
+  };
+
+  const handleOpenResume = (url) => {
+    if (!url) {
+      Alert.alert('No Resume', 'This applicant did not upload a resume.');
+      return;
+    }
+
+    let finalUrl = url;
+    if (!/^https?:\/\//i.test(url)) {
+      const base = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+      const path = url.startsWith('/') ? url : '/' + url;
+      finalUrl = `${base}${path}`;
+    }
+
+    Linking.canOpenURL(finalUrl).then(supported => {
+      if (supported) {
+        Linking.openURL(finalUrl).catch(() => Alert.alert('Error', 'Cannot open resume link.'));
+      } else {
+        Alert.alert('Error', 'Cannot open resume link.');
+      }
+    }).catch(err => {
+      console.log('canOpenURL error', err);
+      Alert.alert('Error', 'Cannot open resume link.');
+    });
+  };
+
+  const handleSchedule = (item) => {
+    navigation.navigate('ScheduleInterview', {
+      applicationId: item.id,
+      applicantName: item.applicant?.first_name,
+      jobTitle: item.job?.title || ''
+    });
   };
 
   return (
