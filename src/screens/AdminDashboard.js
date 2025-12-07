@@ -115,9 +115,9 @@ const AdminDashboard = ({ navigation, route }) => {
                     onPress={() => navigation.navigate('ViewApplications')}
                 />
                 <DashboardCard 
-                    title="Pending" count={stats.pending_tasks} 
-                    iconName="time" color="#dc3545" // Red
-                    onPress={() => navigation.navigate('ViewApplications')} // Link to applications to see pending ones
+                  title="Pending" count={stats.pending_tasks} 
+                  iconName="time" color="#dc3545" // Red
+                  onPress={() => navigation.navigate('AdminPending')}
                 />
               </View>
             )}

@@ -22,280 +22,280 @@ const AdminPending = ({ navigation }) => {
 
   // --- API: FETCH APPLICATIONS ---
   const fetchPending = async () => {
-    try {
-      setLoading(true);
-      // Ensure this endpoint matches your urls.py list view
-      const response = await axios.get(`${API_URL}/job/api/applications/`);
+  try {
+    setLoading(true);
+    // Ensure this endpoint matches your urls.py list view
+    const response = await axios.get(`${API_URL}/job/api/applications/`);
       
-      if (Array.isArray(response.data)) {
-          // Filter only 'Pending' status
-          const pending = response.data.filter(app => app.status === 'Pending');
-          setPendingApps(pending);
-      } else {
-          setPendingApps([]);
-      }
-    } catch (error) {
-      console.error("Error fetching pending:", error);
-    } finally {
-      setLoading(false);
+    if (Array.isArray(response.data)) {
+      // Filter only 'Pending' status
+      const pending = response.data.filter(app => app.status === 'Pending');
+      setPendingApps(pending);
+    } else {
+      setPendingApps([]);
     }
+  } catch (error) {
+    console.error("Error fetching pending:", error);
+  } finally {
+    setLoading(false);
+  }
   };
 
   useFocusEffect(
-    useCallback(() => {
-      fetchPending();
-    }, [])
+  useCallback(() => {
+    fetchPending();
+  }, [])
   );
 
   // --- API: SUBMIT REVIEW (Accept/Reject) ---
   const submitReview = async (applicationId, actionType) => {
-    const targetUrl = `${API_URL}/job/review/${applicationId}/`;
+  const targetUrl = `${API_URL}/job/review/${applicationId}/`;
     
-    console.log(`Attempting POST to: ${targetUrl}`);
-    console.log(`Payload: { action: '${actionType}' }`);
+  console.log(`Attempting POST to: ${targetUrl}`);
+  console.log(`Payload: { action: '${actionType}' }`);
 
-    try {
-        // 1. Send POST request
-        const response = await axios.post(targetUrl, {
-            action: actionType // sends 'accept' or 'reject'
-        });
+  try {
+    // 1. Send POST request
+    const response = await axios.post(targetUrl, {
+      action: actionType // sends 'accept' or 'reject'
+    });
 
-        console.log("Response Success:", response.data);
+    console.log("Response Success:", response.data);
 
-        // 2. Success Feedback
-        const statusText = actionType === 'accept' ? "Accepted" : "Rejected";
-        Alert.alert("Success", `Application has been ${statusText}.`);
+    // 2. Success Feedback
+    const statusText = actionType === 'accept' ? "Accepted" : "Rejected";
+    Alert.alert("Success", `Application has been ${statusText}.`);
         
-        // 3. Close Modal & Remove from List
-        setModalVisible(false);
-        setPendingApps(prevApps => prevApps.filter(app => app.id !== applicationId));
+    // 3. Close Modal & Remove from List
+    setModalVisible(false);
+    setPendingApps(prevApps => prevApps.filter(app => app.id !== applicationId));
 
-    } catch (error) {
-        console.error("Review failed full error:", error);
+  } catch (error) {
+    console.error("Review failed full error:", error);
 
-        // --- DETAILED ERROR HANDLING ---
-        if (error.response) {
-            // The server responded with a status code other than 2xx (e.g. 403, 404, 500)
-            console.log("Server Error Data:", error.response.data);
-            console.log("Server Status:", error.response.status);
+    // --- DETAILED ERROR HANDLING ---
+    if (error.response) {
+      // The server responded with a status code other than 2xx (e.g. 403, 404, 500)
+      console.log("Server Error Data:", error.response.data);
+      console.log("Server Status:", error.response.status);
             
-            Alert.alert(
-                "Server Error", 
-                `Status: ${error.response.status}\nMessage: ${JSON.stringify(error.response.data)}`
-            );
-        } else if (error.request) {
-            // The request was made but no response was received
-            console.log("No response received:", error.request);
-            Alert.alert("Network Error", "Server is not responding. Check if Django is running and your IP is correct.");
-        } else {
-            // Something happened in setting up the request
-            Alert.alert("Error", error.message);
-        }
+      Alert.alert(
+        "Server Error", 
+        `Status: ${error.response.status}\nMessage: ${JSON.stringify(error.response.data)}`
+      );
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.log("No response received:", error.request);
+      Alert.alert("Network Error", "Server is not responding. Check if Django is running and your IP is correct.");
+    } else {
+      // Something happened in setting up the request
+      Alert.alert("Error", error.message);
     }
+  }
   };
 
   // --- ACTION HANDLERS ---
 
   const handleOpenResume = (url) => {
-      if (url) {
-          Linking.openURL(url).catch(err => Alert.alert("Error", "Cannot open resume link."));
-      } else {
-          Alert.alert("No Resume", "This applicant did not upload a resume.");
-      }
+    if (url) {
+      Linking.openURL(url).catch(err => Alert.alert("Error", "Cannot open resume link."));
+    } else {
+      Alert.alert("No Resume", "This applicant did not upload a resume.");
+    }
   };
 
   // Handles confirmation before calling API
   const handleDecision = (actionType) => {
-      Alert.alert(
-          `Confirm ${actionType === 'accept' ? 'Accept' : 'Reject'}`,
-          `Are you sure you want to ${actionType} this applicant?`,
-          [
-              { text: "Cancel", style: "cancel" },
-              { 
-                  text: "Confirm", 
-                  onPress: () => submitReview(selectedApp.id, actionType)
-              }
-          ]
-      );
+    Alert.alert(
+      `Confirm ${actionType === 'accept' ? 'Accept' : 'Reject'}`,
+      `Are you sure you want to ${actionType} this applicant?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Confirm", 
+          onPress: () => submitReview(selectedApp.id, actionType)
+        }
+      ]
+    );
   };
 
   const handleScheduleInterview = () => {
-      setModalVisible(false);
-      // Navigate to Schedule Screen
-      navigation.navigate('ScheduleInterview', { 
-          applicationId: selectedApp.id,
-          applicantName: selectedApp.applicant?.first_name 
-      });
+    setModalVisible(false);
+    // Navigate to Schedule Screen
+    navigation.navigate('ScheduleInterview', { 
+      applicationId: selectedApp.id,
+      applicantName: selectedApp.applicant?.first_name 
+    });
   };
 
   const openReviewModal = (item) => {
-      setSelectedApp(item);
-      setModalVisible(true);
+    setSelectedApp(item);
+    setModalVisible(true);
   };
 
   // --- RENDER ITEM ---
   const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-          <View style={{flex: 1}}>
-            <Text style={styles.name}>
-                {item.applicant?.first_name || "Unknown"} {item.applicant?.last_name || ""}
-            </Text>
-            <Text style={styles.jobTitle}>{item.job?.title || "Unknown Job"}</Text>
-          </View>
-          <View style={styles.pendingBadge}>
-              <Text style={styles.pendingText}>Pending</Text>
-          </View>
+  <View style={styles.card}>
+    <View style={styles.cardHeader}>
+      <View style={{flex: 1}}>
+      <Text style={styles.name}>
+        {item.applicant?.first_name || "Unknown"} {item.applicant?.last_name || ""}
+      </Text>
+      <Text style={styles.jobTitle}>{item.job?.title || "Unknown Job"}</Text>
       </View>
-
-      <Text style={styles.email} numberOfLines={1}>{item.applicant?.email}</Text>
-
-      <TouchableOpacity 
-        style={styles.reviewBtn} 
-        onPress={() => openReviewModal(item)}
-        activeOpacity={0.8}
-      >
-          <Text style={styles.reviewBtnText}>Review Application</Text>
-          <Ionicons name="arrow-forward" size={16} color="white" />
-      </TouchableOpacity>
+      <View style={styles.pendingBadge}>
+        <Text style={styles.pendingText}>Pending</Text>
+      </View>
     </View>
+
+    <Text style={styles.email} numberOfLines={1}>{item.applicant?.email}</Text>
+
+    <TouchableOpacity 
+    style={styles.reviewBtn} 
+    onPress={() => openReviewModal(item)}
+    activeOpacity={0.8}
+    >
+      <Text style={styles.reviewBtnText}>Review Application</Text>
+      <Ionicons name="arrow-forward" size={16} color="white" />
+    </TouchableOpacity>
+  </View>
   );
 
   return (
-    <ImageBackground source={{ uri: BACKGROUND_IMAGE_URL }} style={styles.backgroundImage} resizeMode="cover">
-      <View style={styles.overlay}>
-        <StatusBar barStyle="light-content" />
+  <ImageBackground source={{ uri: BACKGROUND_IMAGE_URL }} style={styles.backgroundImage} resizeMode="cover">
+    <View style={styles.overlay}>
+    <StatusBar barStyle="light-content" />
         
-        {/* HEADER */}
-        <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={24} color="white" />
+    {/* HEADER */}
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Ionicons name="arrow-back" size={24} color="white" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Pending Approvals</Text>
+    </View>
+
+    {/* LIST */}
+    {loading ? (
+      <ActivityIndicator size="large" color="#fff" style={{marginTop: 50}} />
+    ) : (
+      <FlatList
+        data={pendingApps}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="checkmark-done-circle-outline" size={60} color="white" opacity={0.8} />
+            <Text style={{color:'white', marginTop: 10, fontSize: 16}}>No pending applications.</Text>
+          </View>
+        }
+      />
+    )}
+
+    {/* --- DETAILED REVIEW MODAL --- */}
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={() => setModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Application Details</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Pending Approvals</Text>
-        </View>
+          </View>
 
-        {/* LIST */}
-        {loading ? (
-            <ActivityIndicator size="large" color="#fff" style={{marginTop: 50}} />
-        ) : (
-            <FlatList
-                data={pendingApps}
-                keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-                renderItem={renderItem}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                    <View style={styles.emptyState}>
-                        <Ionicons name="checkmark-done-circle-outline" size={60} color="white" opacity={0.8} />
-                        <Text style={{color:'white', marginTop: 10, fontSize: 16}}>No pending applications.</Text>
+          <ScrollView style={styles.modalScroll}>
+            {selectedApp && (
+              <>
+                {/* Profile Section */}
+                <View style={styles.section}>
+                  <View style={styles.profileRow}>
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarText}>{selectedApp.applicant?.first_name?.[0] || "U"}</Text>
                     </View>
-                }
-            />
-        )}
-
-        {/* --- DETAILED REVIEW MODAL --- */}
-        <Modal
-            animationType="slide"
-            transparent={true}
-            visible={modalVisible}
-            onRequestClose={() => setModalVisible(false)}
-        >
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    {/* Modal Header */}
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Application Details</Text>
-                        <TouchableOpacity onPress={() => setModalVisible(false)}>
-                            <Ionicons name="close" size={24} color="#333" />
-                        </TouchableOpacity>
+                    <View style={{flex: 1}}>
+                      <Text style={styles.profileName}>{selectedApp.applicant?.first_name} {selectedApp.applicant?.last_name}</Text>
+                      <Text style={styles.profileJob}>Applied for: <Text style={{fontWeight:'bold', color: '#0d6efd'}}>{selectedApp.job?.title}</Text></Text>
                     </View>
-
-                    <ScrollView style={styles.modalScroll}>
-                        {selectedApp && (
-                            <>
-                                {/* Profile Section */}
-                                <View style={styles.section}>
-                                    <View style={styles.profileRow}>
-                                        <View style={styles.avatarPlaceholder}>
-                                            <Text style={styles.avatarText}>{selectedApp.applicant?.first_name?.[0] || "U"}</Text>
-                                        </View>
-                                        <View style={{flex: 1}}>
-                                            <Text style={styles.profileName}>{selectedApp.applicant?.first_name} {selectedApp.applicant?.last_name}</Text>
-                                            <Text style={styles.profileJob}>Applied for: <Text style={{fontWeight:'bold', color: '#0d6efd'}}>{selectedApp.job?.title}</Text></Text>
-                                        </View>
-                                    </View>
+                  </View>
                                     
-                                    <View style={styles.infoGrid}>
-                                        <View style={styles.infoItem}>
-                                            <Ionicons name="mail-outline" size={16} color="#666" />
-                                            <Text style={styles.infoText}>{selectedApp.applicant?.email || "N/A"}</Text>
-                                        </View>
-                                        <View style={styles.infoItem}>
-                                            <Ionicons name="call-outline" size={16} color="#666" />
-                                            <Text style={styles.infoText}>{selectedApp.applicant?.phone || "No Phone"}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* Resume Section */}
-                                <Text style={styles.sectionTitle}>Documents</Text>
-                                <View style={styles.section}>
-                                    <TouchableOpacity 
-                                        style={styles.docButton} 
-                                        onPress={() => handleOpenResume(selectedApp.resume)}
-                                    >
-                                        <Ionicons name="document-text" size={20} color="#dc3545" />
-                                        <Text style={styles.docButtonText}>View PDF Resume</Text>
-                                        <Ionicons name="open-outline" size={16} color="#666" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Cover Letter Section */}
-                                <Text style={styles.sectionTitle}>Cover Letter</Text>
-                                <View style={styles.section}>
-                                    <Text style={styles.coverLetterText}>
-                                        {selectedApp.cover_letter 
-                                            ? selectedApp.cover_letter 
-                                            : "No cover letter provided by the applicant."}
-                                    </Text>
-                                </View>
-                            </>
-                        )}
-                    </ScrollView>
-
-                    {/* Modal Footer (ACTIONS) */}
-                    <View style={styles.modalFooter}>
-                        {/* Schedule Button */}
-                        <TouchableOpacity 
-                            style={styles.scheduleFullBtn} 
-                            onPress={handleScheduleInterview}
-                        >
-                            <Ionicons name="calendar" size={18} color="white" />
-                            <Text style={styles.footerBtnText}>Schedule Interview</Text>
-                        </TouchableOpacity>
-
-                        <View style={styles.decisionRow}>
-                            {/* Reject Button (Sends 'reject') */}
-                            <TouchableOpacity 
-                                style={[styles.decisionBtn, styles.rejectBtn]} 
-                                onPress={() => handleDecision('reject')}
-                            >
-                                <Ionicons name="close-circle" size={18} color="white" style={{marginRight: 5}}/>
-                                <Text style={styles.footerBtnText}>Reject</Text>
-                            </TouchableOpacity>
-                            
-                            {/* Accept Button (Sends 'accept') */}
-                            <TouchableOpacity 
-                                style={[styles.decisionBtn, styles.acceptBtn]} 
-                                onPress={() => handleDecision('accept')}
-                            >
-                                <Ionicons name="checkmark-circle" size={18} color="white" style={{marginRight: 5}}/>
-                                <Text style={styles.footerBtnText}>Accept</Text>
-                            </TouchableOpacity>
-                        </View>
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="mail-outline" size={16} color="#666" />
+                      <Text style={styles.infoText}>{selectedApp.applicant?.email || "N/A"}</Text>
                     </View>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="call-outline" size={16} color="#666" />
+                      <Text style={styles.infoText}>{selectedApp.applicant?.phone || "No Phone"}</Text>
+                    </View>
+                  </View>
                 </View>
+
+                {/* Resume Section */}
+                <Text style={styles.sectionTitle}>Documents</Text>
+                <View style={styles.section}>
+                  <TouchableOpacity 
+                    style={styles.docButton} 
+                    onPress={() => handleOpenResume(selectedApp.resume)}
+                  >
+                    <Ionicons name="document-text" size={20} color="#dc3545" />
+                    <Text style={styles.docButtonText}>View PDF Resume</Text>
+                    <Ionicons name="open-outline" size={16} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Cover Letter Section */}
+                <Text style={styles.sectionTitle}>Cover Letter</Text>
+                <View style={styles.section}>
+                  <Text style={styles.coverLetterText}>
+                    {selectedApp.cover_letter 
+                      ? selectedApp.cover_letter 
+                      : "No cover letter provided by the applicant."}
+                  </Text>
+                </View>
+              </>
+            )}
+          </ScrollView>
+
+          {/* Modal Footer (ACTIONS) */}
+          <View style={styles.modalFooter}>
+            {/* Schedule Button */}
+            <TouchableOpacity 
+              style={styles.scheduleFullBtn} 
+              onPress={handleScheduleInterview}
+            >
+              <Ionicons name="calendar" size={18} color="white" />
+              <Text style={styles.footerBtnText}>Schedule Interview</Text>
+            </TouchableOpacity>
+
+            <View style={styles.decisionRow}>
+              {/* Reject Button (Sends 'reject') */}
+              <TouchableOpacity 
+                style={[styles.decisionBtn, styles.rejectBtn]} 
+                onPress={() => handleDecision('reject')}
+              >
+                <Ionicons name="close-circle" size={18} color="white" style={{marginRight: 5}}/>
+                <Text style={styles.footerBtnText}>Reject</Text>
+              </TouchableOpacity>
+                            
+              {/* Accept Button (Sends 'accept') */}
+              <TouchableOpacity 
+                style={[styles.decisionBtn, styles.acceptBtn]} 
+                onPress={() => handleDecision('accept')}
+              >
+                <Ionicons name="checkmark-circle" size={18} color="white" style={{marginRight: 5}}/>
+                <Text style={styles.footerBtnText}>Accept</Text>
+              </TouchableOpacity>
             </View>
-        </Modal>
+          </View>
+        </View>
+      </View>
+    </Modal>
 
       </View>
     </ImageBackground>
