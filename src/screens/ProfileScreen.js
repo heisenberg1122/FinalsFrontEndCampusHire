@@ -20,7 +20,7 @@ const ProfileScreen = ({ route, navigation }) => {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>My Profile</Text>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile', { user })}>
             <Ionicons name="pencil" size={14} color="white" />
             <Text style={styles.editBtnText}> Edit Profile</Text>
           </TouchableOpacity>
