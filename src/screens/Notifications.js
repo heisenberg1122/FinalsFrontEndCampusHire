@@ -54,7 +54,16 @@ const Notifications = ({ route, navigation }) => {
     </TouchableOpacity>
   );
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>
+if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>
+
+  // ADD THIS CHECK:
+  if (!user) {
+    return (
+      <View style={styles.center}>
+        <Text>Please log in to view notifications.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
