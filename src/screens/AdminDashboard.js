@@ -47,6 +47,8 @@ const AdminDashboard = ({ navigation, route }) => {
     try {
       setLoadingInterviews(true);
       const res = await axios.get(`${API_URL}/job/api/interviews/`);
+      console.log('fetchInterviews response status:', res.status);
+      console.log('fetchInterviews response data:', res.data);
       if (Array.isArray(res.data)) {
         setInterviews(res.data);
       } else {
@@ -89,11 +91,24 @@ const AdminDashboard = ({ navigation, route }) => {
   // If a new interview was passed via navigation params, prepend it to the list so it shows immediately
   useEffect(() => {
     if (route?.params?.newInterview) {
+      console.log('AdminDashboard received newInterview param:', route.params.newInterview);
       setInterviews(prev => {
-        // Avoid duplicate if already present
-        const exists = prev.some(i => i.id === route.params.newInterview.id);
+        // Normalize shape: if interview contains application object, map to expected fields
+        const newIv = route.params.newInterview;
+        let normalized = newIv;
+        if (newIv && newIv.application && newIv.application.id) {
+          normalized = {
+            id: newIv.id || Math.random(),
+            application_id: newIv.application.id,
+            applicant_name: newIv.application.applicant ? `${newIv.application.applicant.first_name || ''} ${newIv.application.applicant.last_name || ''}`.trim() : (newIv.applicant_name || ''),
+            job_title: newIv.application.job ? (newIv.application.job.title || '') : (newIv.job_title || ''),
+            date_time: newIv.date_time || '',
+            location: newIv.location || ''
+          };
+        }
+        const exists = prev.some(i => i.id === normalized.id);
         if (exists) return prev;
-        return [route.params.newInterview, ...prev];
+        return [normalized, ...prev];
       });
       // clear the param to avoid repeated inserts
       try { route.params.newInterview = null; } catch (e) {}
@@ -134,6 +149,22 @@ const AdminDashboard = ({ navigation, route }) => {
           <TouchableOpacity style={styles.logoutBtn} onPress={() => navigation.replace('Login')}>
               <Ionicons name="log-out-outline" size={20} color="#fff"/>
           </TouchableOpacity>
+        </View>
+
+        {/* Profile mini-card */}
+        <View style={styles.profileMiniCardContainer}>
+          <View style={styles.profileMiniCard}>
+            <View style={styles.avatarSmall}>
+              <Text style={styles.avatarSmallText}>{(user.first_name?.[0] || 'A') + (user.last_name?.[0] || '')}</Text>
+            </View>
+            <View style={{flex:1, marginLeft:12}}>
+              <Text style={styles.profileNameSmall}>{user.first_name} {user.last_name}</Text>
+              {user.email ? <Text style={styles.profileEmailSmall}>{user.email}</Text> : null}
+            </View>
+            <TouchableOpacity style={styles.viewProfileBtn} onPress={() => navigation.navigate('Profile', { user })}>
+              <Text style={styles.viewProfileText}>View Profile</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView 
@@ -289,6 +320,16 @@ const styles = StyleSheet.create({
     width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
   actionText: { fontSize: 13, fontWeight: '600', color: '#555' },
+
+  // --- Profile Mini Card ---
+  profileMiniCardContainer: { paddingHorizontal: 20, marginTop: -20, marginBottom: 12 },
+  profileMiniCard: { backgroundColor: 'white', borderRadius: 12, padding: 10, flexDirection: 'row', alignItems: 'center', shadowColor:'#000', shadowOpacity:0.04, elevation:2 },
+  avatarSmall: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#0d6efd', justifyContent:'center', alignItems:'center' },
+  avatarSmallText: { color: 'white', fontWeight: '700' },
+  profileNameSmall: { fontWeight: '700', fontSize: 14 },
+  profileEmailSmall: { color: '#666', fontSize: 12, marginTop: 2 },
+  viewProfileBtn: { backgroundColor: '#0d6efd', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
+  viewProfileText: { color: 'white', fontWeight: '700', fontSize: 12 },
 
   // --- Interview Section ---
   interviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
