@@ -21,7 +21,7 @@ const ScheduleInterview = ({ route, navigation }) => {
     const [loading, setLoading] = useState(false);
 
     // Replace with your IP
-    const API_URL = 'http://127.0.0.1:8000/api/interviews/create/';
+    const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000/job/api/interviews/create/' : 'http://10.0.2.2:8000/job/api/interviews/create/';
 
     const handleSubmit = async () => {
         if (!date || !time || !location) {

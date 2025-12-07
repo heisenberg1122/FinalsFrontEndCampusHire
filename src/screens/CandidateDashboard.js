@@ -101,7 +101,7 @@ const CandidateDashboard = ({ route, navigation }) => {
         {/* Header */}
         <View style={styles.header}>
             <View>
-                <Text style={styles.logoText}>JobPortal 🚀</Text>
+                <Text style={styles.logoText}>Campus Hire</Text>
                 <Text style={styles.welcomeText}>Hello, {user.first_name}!</Text>
             </View>
             <View style={styles.headerActions}>
