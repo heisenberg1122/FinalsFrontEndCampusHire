@@ -60,8 +60,8 @@ const ViewApplications = ({ navigation }) => {
             <View style={{flex: 1}}>
                 <Text style={styles.name}>{item.applicant?.first_name} {item.applicant?.last_name}</Text>
                 <View style={styles.roleContainer}>
-                     <Ionicons name="briefcase-outline" size={14} color="#0d6efd" style={{marginRight: 4}}/>
-                     <Text style={styles.jobTitle}>{item.job?.title}</Text>
+                      <Ionicons name="briefcase-outline" size={14} color="#0d6efd" style={{marginRight: 4}}/>
+                      <Text style={styles.jobTitle}>{item.job?.title}</Text>
                 </View>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -106,13 +106,24 @@ const ViewApplications = ({ navigation }) => {
       <View style={styles.overlay}>
         <StatusBar barStyle="light-content" />
 
-        {/* Header */}
+        {/* --- MODIFIED HEADER --- */}
         <View style={styles.header}>
+            {/* Back Button */}
              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                 <View style={styles.iconCircle}>
                     <Ionicons name="chevron-back" size={24} color="white" />
                 </View>
-                <Text style={styles.headerTitle}>Job Applications</Text>
+                <Text style={styles.headerTitle}>Applications</Text>
+            </TouchableOpacity>
+
+            {/* NEW: Admin Pending Button */}
+            <TouchableOpacity 
+                style={styles.pendingBtn}
+                onPress={() => navigation.navigate('AdminPending')} // Ensures navigation to the specific screen
+                activeOpacity={0.7}
+            >
+                <Text style={styles.pendingBtnText}>Pending</Text>
+                <Ionicons name="time-outline" size={18} color="white" />
             </TouchableOpacity>
         </View>
 
@@ -145,8 +156,12 @@ const styles = StyleSheet.create({
 
   // --- Header ---
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 45, paddingBottom: 15,
+    flexDirection: 'row', 
+    alignItems: 'center',
+    justifyContent: 'space-between', // Pushes items to edges
+    paddingHorizontal: 20, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 45, 
+    paddingBottom: 15,
   },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   iconCircle: {
@@ -154,6 +169,24 @@ const styles = StyleSheet.create({
       justifyContent: 'center', alignItems: 'center', marginRight: 10
   },
   headerTitle: { fontSize: 24, fontWeight: '800', color: 'white' },
+
+  // --- NEW BUTTON STYLES ---
+  pendingBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)', // Glass effect
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.3)'
+  },
+  pendingBtnText: {
+      color: 'white',
+      fontWeight: '600',
+      fontSize: 14,
+      marginRight: 6
+  },
 
   // --- List & States ---
   listContent: { padding: 20, paddingBottom: 40 },

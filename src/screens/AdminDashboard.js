@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Platform, ImageBackground, Dimensions, StatusBar } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native'; // <--- CRITICAL IMPORT
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,32 +8,49 @@ const { width, height } = Dimensions.get('window');
 
 const AdminDashboard = ({ navigation, route }) => {
   const { user } = route.params || { user: { first_name: 'Admin', last_name: 'User' } };
-  const [stats, setStats] = useState({ total_jobs: 0, total_users: 0, total_applications: 0, pending_tasks: 0 });
+  
+  // Stats State
+  const [stats, setStats] = useState({ 
+    total_jobs: 0, 
+    total_users: 0, 
+    total_applications: 0, 
+    pending_tasks: 0 
+  });
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // 🌐 AUTO-DETECT URL
   const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
 
-  // Same Background Image as Login for consistency (or a similar office theme)
+  // Professional Office Background
   const DASHBOARD_BG = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
 
+  // --- FETCH STATS FUNCTION ---
   const fetchStats = async () => {
     try {
+      // This calls the backend to get the real count of rows in the database
       const response = await axios.get(`${API_URL}/api/stats/`);
       setStats(response.data);
     } catch (error) {
-      console.log("Stats error. Using defaults.");
+      console.log("Stats error. Using defaults.", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { fetchStats(); }, []);
+  // --- 🔄 AUTO-REFRESH LOGIC ---
+  // This runs every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [])
+  );
+
   const onRefresh = () => { setRefreshing(true); fetchStats(); };
 
-  // --- STAT CARD COMPONENT (Styled like Login Cards) ---
+  // --- STAT CARD COMPONENT ---
   const DashboardCard = ({ title, count, iconName, onPress, color }) => (
     <TouchableOpacity 
       style={styles.card} 
@@ -40,7 +58,6 @@ const AdminDashboard = ({ navigation, route }) => {
       activeOpacity={0.9}
     >
       <View style={[styles.iconCircle, { backgroundColor: color + '20' }]}> 
-        {/* '20' adds transparency to hex color */}
         <Ionicons name={iconName} size={24} color={color} />
       </View>
       <View style={styles.cardContent}>
@@ -100,7 +117,7 @@ const AdminDashboard = ({ navigation, route }) => {
                 <DashboardCard 
                     title="Pending" count={stats.pending_tasks} 
                     iconName="time" color="#dc3545" // Red
-                    onPress={() => alert("No pending tasks")}
+                    onPress={() => navigation.navigate('ViewApplications')} // Link to applications to see pending ones
                 />
               </View>
             )}
@@ -167,17 +184,16 @@ const styles = StyleSheet.create({
   headerTitle: { color: 'white', fontSize: 26, fontWeight: '800' },
   logoutBtn: {
     backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 12,
-    backdropFilter: 'blur(10px)', // Works on web
   },
 
-  // --- Main Glass Container (Matches Login Card Style) ---
+  // --- Main Glass Container ---
   mainContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)', // High opacity white
     borderRadius: 25,
     padding: 25,
     shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, 
     shadowOpacity: 0.15, shadowRadius: 20, elevation: 10,
-    minHeight: height * 0.7, // Takes up good portion of screen
+    minHeight: height * 0.7, 
   },
 
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 15 },

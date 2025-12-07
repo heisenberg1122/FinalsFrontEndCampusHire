@@ -14,6 +14,7 @@ import UserManagement from './src/screens/UserManagement';
 import ViewApplications from './src/screens/ViewApplications';
 import ApplyJobScreen from './src/screens/ApplyJobScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import AdminPending from './src/screens/AdminPending';
 
 const Stack = createStackNavigator();
 
@@ -35,6 +36,7 @@ export default function App() {
         <Stack.Screen name="CandidateDashboard" component={CandidateDashboard} />
         <Stack.Screen name="ApplyJob" component={ApplyJobScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="AdminPending" component={AdminPending} />
       </Stack.Navigator>
     </NavigationContainer>
   );
