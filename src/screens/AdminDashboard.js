@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Platform, ImageBackground, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Platform, ImageBackground, Dimensions, StatusBar } from 'react-native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,8 +14,8 @@ const AdminDashboard = ({ navigation, route }) => {
   // 🌐 AUTO-DETECT URL
   const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
 
-  // Professional Abstract Background Image
-  const DASHBOARD_BG = 'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3';
+  // Same Background Image as Login for consistency (or a similar office theme)
+  const DASHBOARD_BG = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
 
   const fetchStats = async () => {
     try {
@@ -32,120 +32,120 @@ const AdminDashboard = ({ navigation, route }) => {
   useEffect(() => { fetchStats(); }, []);
   const onRefresh = () => { setRefreshing(true); fetchStats(); };
 
-  // --- MODERN CARD COMPONENT ---
-  const DashboardCard = ({ title, count, btnText, onPress, colorTheme, iconName }) => (
-    <View style={[styles.card, { backgroundColor: colorTheme.bgTint }]}>
-      <View style={styles.cardHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: colorTheme.main }]}>
-             <Ionicons name={iconName} size={20} color="white" />
-          </View>
-          <Text style={styles.cardTitle}>{title}</Text>
+  // --- STAT CARD COMPONENT (Styled like Login Cards) ---
+  const DashboardCard = ({ title, count, iconName, onPress, color }) => (
+    <TouchableOpacity 
+      style={styles.card} 
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <View style={[styles.iconCircle, { backgroundColor: color + '20' }]}> 
+        {/* '20' adds transparency to hex color */}
+        <Ionicons name={iconName} size={24} color={color} />
       </View>
-      <Text style={[styles.cardCount, { color: colorTheme.dark }]}>{count}</Text>
-      <TouchableOpacity
-        style={[styles.cardBtn, { backgroundColor: colorTheme.main }]}
-        onPress={onPress}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.cardBtnText}>{btnText}</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.cardContent}>
+        <Text style={styles.cardCount}>{count}</Text>
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
+      <View style={styles.arrowContainer}>
+        <Ionicons name="chevron-forward" size={20} color="#ccc" />
+      </View>
+    </TouchableOpacity>
   );
-
-  // Color Themes for Cards
-  const themes = {
-      blue: { main: '#2E5BFF', bgTint: '#F4F7FF', dark: '#1A3B9C' }, // Jobs
-      teal: { main: '#00C9A7', bgTint: '#F0FCF9', dark: '#007A65' }, // Users
-      green: { main: '#34A853', bgTint: '#F1F9F4', dark: '#1E6331' }, // Apps
-      orange: { main: '#FFBC00', bgTint: '#FFFBEA', dark: '#9C7300' }, // Tasks
-  };
 
   return (
     <ImageBackground source={{ uri: DASHBOARD_BG }} style={styles.backgroundImage} resizeMode="cover">
       <View style={styles.overlay}>
-        {/* Header */}
+        <StatusBar barStyle="light-content" />
+        
+        {/* Header Section */}
         <View style={styles.header}>
           <View>
              <Text style={styles.headerSubTitle}>Welcome back,</Text>
-             <Text style={styles.headerTitle}>{user.first_name} {user.last_name} 👋</Text>
+             <Text style={styles.headerTitle}>{user.first_name} {user.last_name}</Text>
           </View>
           <TouchableOpacity style={styles.logoutBtn} onPress={() => navigation.replace('Login')}>
-              <Ionicons name="log-out-outline" size={18} color="#2E5BFF" style={{marginRight:5}}/>
-              <Text style={styles.logoutText}>Logout</Text>
+              <Ionicons name="log-out-outline" size={20} color="#fff"/>
           </TouchableOpacity>
         </View>
 
-        <ScrollView
+        <ScrollView 
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2E5BFF"/>}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff"/>}
         >
-          {/* Welcome Banner */}
-          <View style={styles.banner}>
-            <Ionicons name="information-circle" size={24} color="#2E5BFF" style={{marginRight: 10}} />
-            <View>
-                <Text style={styles.bannerText}>System Overview updated.</Text>
-                <Text style={styles.bannerSub}>Check your latest stats below.</Text>
+          
+          {/* Main Content Container (Glassmorphism) */}
+          <View style={styles.mainContainer}>
+            
+            <Text style={styles.sectionTitle}>Overview</Text>
+
+            {loading ? <ActivityIndicator size="large" color="#0d6efd" style={{marginVertical: 20}} /> : (
+              <View style={styles.grid}>
+                <DashboardCard 
+                    title="Total Jobs" count={stats.total_jobs} 
+                    iconName="briefcase" color="#0d6efd" // Blue
+                    onPress={() => navigation.navigate('JobPostings')}
+                />
+                <DashboardCard 
+                    title="Users" count={stats.total_users} 
+                    iconName="people" color="#198754" // Green
+                    onPress={() => navigation.navigate('UserManagement')}
+                />
+                <DashboardCard 
+                    title="Applicants" count={stats.total_applications} 
+                    iconName="document-text" color="#fd7e14" // Orange
+                    onPress={() => navigation.navigate('ViewApplications')}
+                />
+                <DashboardCard 
+                    title="Pending" count={stats.pending_tasks} 
+                    iconName="time" color="#dc3545" // Red
+                    onPress={() => alert("No pending tasks")}
+                />
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            {/* Quick Actions */}
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('JobPostings')}>
+                   <View style={[styles.actionIcon, { backgroundColor: '#e7f1ff' }]}>
+                      <Ionicons name="add-circle" size={24} color="#0d6efd" />
+                   </View>
+                   <Text style={styles.actionText}>Post Job</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('UserManagement')}>
+                   <View style={[styles.actionIcon, { backgroundColor: '#e6f8f0' }]}>
+                      <Ionicons name="person-add" size={24} color="#198754" />
+                   </View>
+                   <Text style={styles.actionText}>Add User</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ViewApplications')}>
+                   <View style={[styles.actionIcon, { backgroundColor: '#fff3cd' }]}>
+                      <Ionicons name="documents" size={24} color="#fd7e14" />
+                   </View>
+                   <Text style={styles.actionText}>Review</Text>
+                </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Stats Grid */}
-          {loading ? <ActivityIndicator size="large" color="#2E5BFF" style={{marginVertical: 20}} /> : (
-            <View style={styles.grid}>
-              <DashboardCard
-                  title="Total Jobs" count={stats.total_jobs} btnText="Manage Jobs"
-                  colorTheme={themes.blue} iconName="briefcase"
-                  onPress={() => navigation.navigate('JobPostings')}
-              />
-              <DashboardCard
-                  title="Users" count={stats.total_users} btnText="Manage Users"
-                  colorTheme={themes.teal} iconName="people"
-                  onPress={() => navigation.navigate('UserManagement')}
-              />
-              <DashboardCard
-                  title="Applications" count={stats.total_applications} btnText="View All"
-                  colorTheme={themes.green} iconName="document-text"
-                  onPress={() => navigation.navigate('ViewApplications')}
-              />
-              <DashboardCard
-                  title="Pending Tasks" count={stats.pending_tasks} btnText="Review"
-                  colorTheme={themes.orange} iconName="time"
-                  onPress={() => alert("No pending tasks")}
-              />
+            <View style={styles.divider} />
+
+            {/* Recent Activity / Placeholder */}
+            <View style={styles.interviewHeader}>
+                <Text style={styles.sectionTitle}>Interview Schedule</Text>
+                <TouchableOpacity><Text style={styles.linkText}>View All</Text></TouchableOpacity>
             </View>
-          )}
+            
+            <View style={styles.emptyState}>
+                <Ionicons name="calendar-outline" size={40} color="#ddd" />
+                <Text style={styles.emptyText}>No interviews scheduled today.</Text>
+            </View>
 
-          {/* Quick Actions & Interviews Container */}
-          <View style={styles.glassContainer}>
-              {/* Quick Actions */}
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-              <View style={styles.actionsBox}>
-                  <TouchableOpacity style={[styles.actBtn, {backgroundColor: themes.green.main}]} onPress={() => navigation.navigate('JobPostings')} activeOpacity={0.8}>
-                      <Ionicons name="add-circle" size={18} color="white"/>
-                      <Text style={styles.actText}> Post a Job</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actBtn, {backgroundColor: themes.blue.main}]} onPress={() => navigation.navigate('UserManagement')} activeOpacity={0.8}>
-                      <Ionicons name="person-add" size={18} color="white"/>
-                      <Text style={styles.actText}> Add User</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actBtn, {backgroundColor: themes.teal.main}]} onPress={() => navigation.navigate('ViewApplications')} activeOpacity={0.8}>
-                      <Ionicons name="documents" size={18} color="white"/>
-                      <Text style={styles.actText}> Applicants</Text>
-                  </TouchableOpacity>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Upcoming Interviews */}
-              <View style={styles.interviewHeaderRow}>
-                  <Text style={styles.sectionTitle}>Upcoming Interviews</Text>
-                  <TouchableOpacity><Text style={{color: themes.blue.main, fontWeight:'600', fontSize:12}}>View Schedule</Text></TouchableOpacity>
-              </View>
-              <View style={styles.interviewBody}>
-                  <Ionicons name="calendar-clear-outline" size={40} color="#ccc" marginBottom={10}/>
-                  <Text style={{color:'#999', fontStyle:'italic'}}>No interviews scheduled for today.</Text>
-              </View>
           </View>
-
         </ScrollView>
       </View>
     </ImageBackground>
@@ -153,68 +153,68 @@ const AdminDashboard = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  // Background & Structure
+  // --- Background & Layout ---
   backgroundImage: { flex: 1, width: width, height: height },
-  overlay: { flex: 1, backgroundColor: 'rgba(245, 247, 250, 0.85)' }, // Light overlay for readability
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }, // Slightly darker overlay for white text header
   scrollContent: { padding: 20, paddingBottom: 40 },
 
-  // Header
+  // --- Header ---
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 20,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 45, paddingBottom: 25,
   },
-  headerSubTitle: { color: '#718096', fontSize: 14, fontWeight: '600' },
-  headerTitle: { color: '#2D3748', fontSize: 22, fontWeight: '800' },
+  headerSubTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
+  headerTitle: { color: 'white', fontSize: 26, fontWeight: '800' },
   logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: 'white',
-    paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2
+    backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 12,
+    backdropFilter: 'blur(10px)', // Works on web
   },
-  logoutText: { color: '#2E5BFF', fontWeight: '700', fontSize: 13 },
 
-  // Banner
-  banner: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.9)',
-    padding: 15, borderRadius: 15, marginBottom: 25,
-    borderLeftWidth: 4, borderLeftColor: '#2E5BFF',
-    shadowColor: '#2E5BFF', shadowOpacity: 0.1, shadowRadius: 10, elevation: 3
+  // --- Main Glass Container (Matches Login Card Style) ---
+  mainContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // High opacity white
+    borderRadius: 25,
+    padding: 25,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, 
+    shadowOpacity: 0.15, shadowRadius: 20, elevation: 10,
+    minHeight: height * 0.7, // Takes up good portion of screen
   },
-  bannerText: { fontSize: 16, fontWeight: '700', color: '#2D3748' },
-  bannerSub: { color: '#718096', fontSize: 13, marginTop: 2 },
 
-  // Grid & Cards
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 25 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 15 },
+
+  // --- Stats Grid ---
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   card: {
-    width: '48%', padding: 15, borderRadius: 20, marginBottom: 15,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)'
+    width: '48%', backgroundColor: 'white', borderRadius: 15, padding: 15, marginBottom: 15,
+    borderWidth: 1, borderColor: '#f0f0f0',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2,
+    flexDirection: 'column', justifyContent: 'space-between'
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  iconContainer: { padding: 8, borderRadius: 10, marginRight: 10 },
-  cardTitle: { fontSize: 13, color: '#718096', fontWeight: '600', flex: 1, flexWrap: 'wrap' },
-  cardCount: { fontSize: 32, fontWeight: '800', marginBottom: 20 },
-  cardBtn: { paddingVertical: 10, width: '100%', borderRadius: 12, alignItems: 'center', shadowOpacity: 0.2, shadowRadius: 5, shadowOffset: {width:0, height:3}, elevation: 4 },
-  cardBtnText: { fontSize: 13, fontWeight: '700', color: 'white' },
+  iconCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  cardContent: { marginBottom: 5 },
+  cardCount: { fontSize: 24, fontWeight: '800', color: '#333' },
+  cardTitle: { fontSize: 13, color: '#666', fontWeight: '600' },
+  arrowContainer: { position: 'absolute', top: 15, right: 10 },
 
-  // Glass Container for Bottom Sections
-  glassContainer: {
-    backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 20, padding: 20,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3
+  // --- Divider ---
+  divider: { height: 1, backgroundColor: '#f0f2f5', marginVertical: 20 },
+
+  // --- Quick Actions ---
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  actionButton: { alignItems: 'center', width: '30%' },
+  actionIcon: {
+    width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
-  sectionTitle: { color: '#2D3748', fontWeight: '800', fontSize: 16, marginBottom: 15 },
-  actionsBox: { flexDirection: 'row', gap: 10, flexWrap:'wrap' },
-  actBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, shadowOpacity: 0.2, shadowRadius: 5, elevation: 3, minWidth: '30%' },
-  actText: { color: 'white', fontWeight: '700', fontSize: 12 },
+  actionText: { fontSize: 13, fontWeight: '600', color: '#555' },
 
-  divider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 20 },
-
-  // Interviews
-  interviewHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  interviewBody: { alignItems: 'center', padding: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: '#E2E8F0', borderRadius: 15 },
+  // --- Interview Section ---
+  interviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  linkText: { color: '#0d6efd', fontWeight: '700', fontSize: 13 },
+  emptyState: { 
+    alignItems: 'center', padding: 30, backgroundColor: '#f8f9fa', 
+    borderRadius: 15, borderWidth: 1, borderColor: '#e9ecef', borderStyle: 'dashed' 
+  },
+  emptyText: { color: '#999', marginTop: 10, fontSize: 14 }
 });
 
 export default AdminDashboard;

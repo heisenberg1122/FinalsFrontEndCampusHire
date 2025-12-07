@@ -1,95 +1,194 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert, ImageBackground, Dimensions, StatusBar, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width, height } = Dimensions.get('window');
 
 const ViewApplications = ({ navigation }) => {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // 🌐 AUTO-DETECT URL
   const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
 
-  useEffect(() => {
-    fetchApplications();
-  }, []);
+  // Shared Background
+  const BACKGROUND_IMAGE_URL = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
 
   const fetchApplications = async () => {
     try {
-      // Connects to the backend API we made earlier
+      // Connects to the backend API
       const response = await axios.get(`${API_URL}/job/api/applications/`); 
       setApplications(response.data);
     } catch (error) {
       console.log(error);
-      Alert.alert("Error", "Could not fetch applications.");
+      // Silent fail on console, but could alert user if needed
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.row}>
-        <View style={{flex:1}}>
-            <Text style={styles.name}>{item.applicant?.first_name} {item.applicant?.last_name}</Text>
-            <Text style={styles.email}>{item.applicant?.email}</Text>
-            <Text style={styles.job}>Role: <Text style={{fontWeight:'bold', color:'#0d6efd'}}>{item.job?.title}</Text></Text>
-        </View>
-        <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{item.status}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.btn} onPress={() => Alert.alert("Resume", "Resume download logic")}>
-            <Ionicons name="document-text-outline" size={16} color="white" />
-            <Text style={styles.btnText}> Resume</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, {backgroundColor:'#ffc107'}]} onPress={() => Alert.alert("Schedule", "Open Calendar logic")}>
-            <Ionicons name="calendar-outline" size={16} color="white" />
-            <Text style={styles.btnText}> Schedule</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+  // Auto-refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchApplications();
+    }, [])
   );
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Job Applications</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtn}>Back</Text>
-        </TouchableOpacity>
-      </View>
+  const onRefresh = () => { setRefreshing(true); fetchApplications(); };
 
-      {loading ? <ActivityIndicator size="large" color="#0d6efd" style={{marginTop:20}} /> : (
-        <FlatList 
+  // --- HELPER: Get Color based on Status ---
+  const getStatusStyle = (status) => {
+      switch(status) {
+          case 'Accepted': return { bg: '#d1e7dd', text: '#0f5132' }; // Green
+          case 'Rejected': return { bg: '#f8d7da', text: '#842029' }; // Red
+          case 'Pending': return { bg: '#fff3cd', text: '#664d03' };  // Orange/Yellow
+          default: return { bg: '#e2e3e5', text: '#41464b' };        // Gray
+      }
+  };
+
+  const renderItem = ({ item }) => {
+    const statusStyle = getStatusStyle(item.status);
+
+    return (
+      <View style={styles.card}>
+        {/* Top Row: Name & Status */}
+        <View style={styles.headerRow}>
+            <View style={{flex: 1}}>
+                <Text style={styles.name}>{item.applicant?.first_name} {item.applicant?.last_name}</Text>
+                <View style={styles.roleContainer}>
+                     <Ionicons name="briefcase-outline" size={14} color="#0d6efd" style={{marginRight: 4}}/>
+                     <Text style={styles.jobTitle}>{item.job?.title}</Text>
+                </View>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status}</Text>
+            </View>
+        </View>
+        
+        {/* Contact Info */}
+        <View style={styles.infoRow}>
+            <Ionicons name="mail-outline" size={14} color="#666" style={{marginRight: 6}} />
+            <Text style={styles.email}>{item.applicant?.email}</Text>
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Action Buttons */}
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={[styles.btn, styles.resumeBtn]} 
+            onPress={() => Alert.alert("Resume", "Downloading resume...")}
+            activeOpacity={0.8}
+          >
+              <Ionicons name="document-text" size={16} color="white" />
+              <Text style={styles.btnText}>Resume</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.btn, styles.scheduleBtn]} 
+            onPress={() => Alert.alert("Schedule", "Opening Interview Scheduler...")}
+            activeOpacity={0.8}
+          >
+              <Ionicons name="calendar" size={16} color="white" />
+              <Text style={styles.btnText}>Schedule</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <ImageBackground source={{ uri: BACKGROUND_IMAGE_URL }} style={styles.backgroundImage} resizeMode="cover">
+      <View style={styles.overlay}>
+        <StatusBar barStyle="light-content" />
+
+        {/* Header */}
+        <View style={styles.header}>
+             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <View style={styles.iconCircle}>
+                    <Ionicons name="chevron-back" size={24} color="white" />
+                </View>
+                <Text style={styles.headerTitle}>Job Applications</Text>
+            </TouchableOpacity>
+        </View>
+
+        {loading ? (
+           <View style={styles.centerLoading}><ActivityIndicator size="large" color="#ffffff" /></View>
+        ) : (
+          <FlatList 
             data={applications}
             keyExtractor={item => item.id.toString()}
             renderItem={renderItem}
-            contentContainerStyle={{padding: 15}}
-            ListEmptyComponent={<Text style={{textAlign:'center', marginTop:20, color:'#666'}}>No applications found.</Text>}
-        />
-      )}
-    </View>
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+            ListEmptyComponent={
+                <View style={styles.emptyState}>
+                    <Ionicons name="folder-open-outline" size={50} color="white" style={{opacity: 0.8}} />
+                    <Text style={{color: 'white', marginTop: 10, fontSize: 16}}>No applications received yet.</Text>
+                </View>
+            }
+          />
+        )}
+      </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  header: { backgroundColor: 'white', padding: 20, paddingTop: 50, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: '#eee' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#333' },
-  backBtn: { color: '#0d6efd', fontWeight: 'bold' },
-  card: { backgroundColor: 'white', padding: 20, borderRadius: 10, marginBottom: 15, elevation: 2 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  name: { fontSize: 18, fontWeight: 'bold' },
-  email: { color: '#666', fontSize: 12, marginBottom: 5 },
-  job: { fontSize: 14, marginTop: 5 },
-  statusBadge: { backgroundColor: '#e9ecef', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, height: 30, justifyContent: 'center' },
-  statusText: { fontSize: 12, fontWeight: 'bold', color: '#495057' },
+  // --- Background ---
+  backgroundImage: { flex: 1, width: width, height: height },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+
+  // --- Header ---
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 45, paddingBottom: 15,
+  },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
+  iconCircle: {
+      backgroundColor: 'rgba(255,255,255,0.2)', width: 35, height: 35, borderRadius: 17.5,
+      justifyContent: 'center', alignItems: 'center', marginRight: 10
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: 'white' },
+
+  // --- List & States ---
+  listContent: { padding: 20, paddingBottom: 40 },
+  centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
+
+  // --- Card (Glassmorphism) ---
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // High opacity white
+    borderRadius: 16, padding: 20, marginBottom: 15,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 4
+  },
+  
+  // Header Row (Name + Status)
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 },
+  name: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  roleContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  jobTitle: { fontSize: 14, color: '#0d6efd', fontWeight: '600' },
+  
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+
+  // Info Row
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+  email: { color: '#666', fontSize: 13 },
+
+  divider: { height: 1, backgroundColor: '#e9ecef', marginVertical: 15 },
+
+  // Actions
   actions: { flexDirection: 'row', gap: 10 },
-  btn: { backgroundColor: '#0d6efd', padding: 10, borderRadius: 5, flexDirection: 'row', alignItems: 'center' },
-  btnText: { color: 'white', fontWeight: 'bold', fontSize: 12, marginLeft: 5 }
+  btn: { flex: 1, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.1, elevation: 2 },
+  btnText: { color: 'white', fontWeight: 'bold', fontSize: 13, marginLeft: 6 },
+  
+  resumeBtn: { backgroundColor: '#0d6efd' }, // Blue
+  scheduleBtn: { backgroundColor: '#fd7e14' }, // Orange
 });
 
 export default ViewApplications;
