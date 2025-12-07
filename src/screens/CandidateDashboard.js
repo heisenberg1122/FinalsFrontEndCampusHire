@@ -105,14 +105,26 @@ const CandidateDashboard = ({ route, navigation }) => {
                 <Text style={styles.welcomeText}>Hello, {user.first_name}!</Text>
             </View>
             <View style={styles.headerActions}>
+                
+                {/* --- NEW: Notification Button --- */}
+                <TouchableOpacity 
+                    style={[styles.iconBtn, { marginRight: 8 }]} 
+                    onPress={() => navigation.navigate('UserNotification', { user })}
+                >
+                    <Ionicons name="notifications" size={26} color="white" />
+                </TouchableOpacity>
+
+                {/* Profile Button */}
                 <TouchableOpacity 
                     style={styles.iconBtn} 
                     onPress={() => navigation.navigate('Profile', { user })}
                 >
                     <Ionicons name="person-circle-outline" size={28} color="white" />
                 </TouchableOpacity>
+
+                {/* Logout Button */}
                 <TouchableOpacity 
-                    style={[styles.iconBtn, {marginLeft: 10}]} 
+                    style={[styles.iconBtn, {marginLeft: 8}]} 
                     onPress={() => navigation.replace('Login')}
                 >
                     <Ionicons name="log-out-outline" size={26} color="white" />
