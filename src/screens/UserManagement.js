@@ -59,6 +59,7 @@ const UserManagement = ({ navigation }) => {
             setUsers(response.data);
         } catch (error) {
             console.log(error);
+            // Optional: Alert.alert("Error", "Could not fetch users.");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -173,7 +174,8 @@ const UserManagement = ({ navigation }) => {
                             {/* Add User Button */}
                             <TouchableOpacity 
                                 style={styles.addBtn}
-                                onPress={() => Alert.alert("Add User", "Navigate to registration screen")}
+                                // 👇 IMPORTANT: Change 'SignUp' to 'Registration' if that is your screen name in App.js
+                                onPress={() => navigation.navigate('SignUp')} 
                                 activeOpacity={0.9}
                             >
                                 <Ionicons name="person-add" size={20} color={palette.accent} />

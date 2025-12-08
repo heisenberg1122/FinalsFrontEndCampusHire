@@ -17,6 +17,7 @@ import {
     useWindowDimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker'; // <--- 1. IMPORT ADDED
 import axios from 'axios'; 
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +32,8 @@ const palette = {
     textSecondary: "#64748B",
     accent: "#3B82F6",
     accentSoft: "rgba(59, 130, 246, 0.1)",
+    success: "#10B981",
+    successSoft: "#D1FAE5",
     cardBorder: "#E2E8F0",
     iconNeutral: "#94A3B8"
 };
@@ -59,6 +62,9 @@ const EditProfile = ({ route, navigation }) => {
     });
 
     const [image, setImage] = useState(initialUser?.profile_picture ? { uri: initialUser.profile_picture } : null);
+    
+    // 2. NEW STATE FOR RESUME
+    const [resume, setResume] = useState(null); 
 
     const getDisplayUri = (uri) => {
         if (!uri) return null;
@@ -84,6 +90,8 @@ const EditProfile = ({ route, navigation }) => {
                     if (data.profile_picture) {
                         setImage({ uri: data.profile_picture });
                     }
+                    // We don't automatically load the resume file object here because
+                    // we can't edit the existing file on the server, only replace it.
                 })
                 .catch(err => {
                     console.log('Failed to load user', err);
@@ -93,6 +101,7 @@ const EditProfile = ({ route, navigation }) => {
         }
     }, []);
 
+    // Permissions for Image
     useEffect(() => {
         (async () => {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -119,6 +128,23 @@ const EditProfile = ({ route, navigation }) => {
         }
     };
 
+    // 3. NEW FUNCTION TO PICK RESUME
+    const pickResume = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'application/pdf', // Limit to PDFs
+                copyToCacheDirectory: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setResume(result.assets[0]);
+            }
+        } catch (err) {
+            console.log("Picker Error:", err);
+            Alert.alert("Error", "Failed to pick file.");
+        }
+    };
+
     const handleChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
     const handleSave = () => {
@@ -126,27 +152,47 @@ const EditProfile = ({ route, navigation }) => {
         setSaving(true);
 
         const uri = image?.uri || null;
+        // Check if image is new (local file)
         const isNewImage = uri && (uri.startsWith('file://') || uri.startsWith('content://'));
+        // Check if resume is new (selected from picker)
+        const isNewResume = resume && resume.uri;
 
-        if (isNewImage) {
+        // 4. UPDATED LOGIC: If EITHER Image OR Resume is new, use FormData
+        if (isNewImage || isNewResume) {
             // --- MULTIPART REQUEST ---
             const formData = new FormData();
+            
+            // Append Text Fields
             Object.keys(form).forEach(key => {
                 if (form[key] !== undefined && form[key] !== null) {
                     formData.append(key, form[key]);
                 }
             });
 
-            const uriParts = uri.split('.');
-            const fileExt = uriParts.length > 1 ? uriParts[uriParts.length - 1].split('?')[0] : 'jpg';
-            
-            formData.append('profile_picture', {
-                uri: uri,
-                name: `profile.${fileExt}`,
-                type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
-            });
+            // Append Image (only if new)
+            if (isNewImage) {
+                const uriParts = uri.split('.');
+                const fileExt = uriParts.length > 1 ? uriParts[uriParts.length - 1].split('?')[0] : 'jpg';
+                
+                formData.append('profile_picture', {
+                    uri: uri,
+                    name: `profile.${fileExt}`,
+                    type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
+                });
+            }
 
-            axios.put(`${API_URL}/reg/api/users/${userId}/`, formData)
+            // Append Resume (only if new)
+            if (isNewResume) {
+                formData.append('resume', {
+                    uri: resume.uri,
+                    name: resume.name,
+                    type: resume.mimeType || 'application/pdf',
+                });
+            }
+
+            axios.put(`${API_URL}/reg/api/users/${userId}/`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            })
             .then(res => {
                 navigation.navigate('Profile', { user: res.data });
             })
@@ -157,7 +203,7 @@ const EditProfile = ({ route, navigation }) => {
             .finally(() => setSaving(false));
 
         } else {
-            // --- JSON REQUEST ---
+            // --- JSON REQUEST (No files changed) ---
             axios.put(`${API_URL}/reg/api/users/${userId}/`, form)
                 .then(res => {
                     navigation.navigate('Profile', { user: res.data });
@@ -301,6 +347,37 @@ const EditProfile = ({ route, navigation }) => {
                                 placeholderTextColor={palette.iconNeutral}
                             />
 
+                            {/* 5. RESUME UPLOAD SECTION (ADDED) */}
+                            <Text style={styles.label}>RESUME</Text>
+                            <TouchableOpacity 
+                                style={[
+                                    styles.fileBtn, 
+                                    resume && styles.fileBtnActive 
+                                ]} 
+                                onPress={pickResume}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[
+                                    styles.fileIconBox,
+                                    resume && { backgroundColor: 'white' }
+                                ]}>
+                                    <Ionicons 
+                                        name={resume ? "document-text" : "cloud-upload"} 
+                                        size={20} 
+                                        color={resume ? palette.success : palette.accent} 
+                                    />
+                                </View>
+                                <View style={{flex: 1}}>
+                                    <Text style={[
+                                        styles.fileText,
+                                        resume && { color: 'white', fontWeight: '700' }
+                                    ]}>
+                                        {resume ? resume.name : "Upload new Resume (PDF)"}
+                                    </Text>
+                                </View>
+                                {resume && <Ionicons name="checkmark-circle" size={24} color="white" />}
+                            </TouchableOpacity>
+
                             {/* SAVE BUTTON */}
                             <TouchableOpacity 
                                 style={[styles.saveBtn, saving && {opacity: 0.7}]} 
@@ -387,6 +464,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
     },
     textArea: { height: 100 },
+
+    // File Upload Styles (New)
+    fileBtn: { 
+        borderWidth: 1.5, borderColor: palette.cardBorder, borderStyle: 'dashed', 
+        borderRadius: 12, backgroundColor: palette.background, 
+        height: 55, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        marginBottom: 24, paddingHorizontal: 15
+    },
+    fileBtnActive: {
+        backgroundColor: palette.success,
+        borderColor: palette.success,
+        borderStyle: 'solid'
+    },
+    fileIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: palette.accentSoft, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+    fileText: { color: palette.textSecondary, fontWeight: '600', fontSize: 13 },
 
     // Layout
     row: { flexDirection: 'row', justifyContent: 'space-between' },

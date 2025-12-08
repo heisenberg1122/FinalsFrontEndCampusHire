@@ -18,6 +18,7 @@ import {
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,26 +43,69 @@ const ApplyJobScreen = ({ route, navigation }) => {
 
     const [coverLetter, setCoverLetter] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resume, setResume] = useState(null);
 
-    // 🌐 CONFIG
-    const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
+    // 🌐 CONFIG - Ensure this matches your backend URL
+    const API_URL = 'https://finalsbackendcampushire.onrender.com';
     const HEADER_BG = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop';
 
+    // --- FUNCTION TO PICK FILE ---
+    const pickResume = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'application/pdf', // Limit to PDFs
+                copyToCacheDirectory: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setResume(result.assets[0]);
+            }
+        } catch (err) {
+            console.log("Picker Error:", err);
+            Alert.alert("Error", "Failed to pick file.");
+        }
+    };
+
+    // --- SUBMIT LOGIC (FormData) ---
     const handleSubmit = async () => {
         if (!coverLetter.trim()) {
             Alert.alert("Missing Info", "Please write a short cover letter.");
             return;
         }
 
+        // Optional: Enforce resume upload
+        if (!resume) {
+            Alert.alert("Missing Resume", "Please upload your resume (PDF).");
+            return;
+        }
+
         setLoading(true);
         try {
-            const payload = {
-                job_id: job.id,
-                user_id: user.id,
-                cover_letter: coverLetter
-            };
+            // Create FormData object
+            const formData = new FormData();
+            
+            // Append text fields
+            formData.append('job_id', job.id);
+            formData.append('user_id', user.id);
+            formData.append('cover_letter', coverLetter);
 
-            await axios.post(`${API_URL}/job/api/apply/`, payload);
+            // Append File
+            // React Native needs uri, name, and type for files in FormData
+            if (resume) {
+                const fileToUpload = {
+                    uri: resume.uri,
+                    name: resume.name,
+                    type: resume.mimeType || 'application/pdf',
+                };
+                formData.append('resume', fileToUpload);
+            }
+
+            // Send Request with specific headers for FormData
+            await axios.post(`${API_URL}/job/api/apply/`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             
             Alert.alert("Success", `Application for ${job.title} submitted successfully!`, [
                 { text: "OK", onPress: () => navigation.goBack() }
@@ -70,8 +114,9 @@ const ApplyJobScreen = ({ route, navigation }) => {
         } catch (error) {
             console.log("Apply Error:", error);
             let msg = "Failed to submit application.";
-            if (error.response && error.response.data && error.response.data.error) {
-                msg = error.response.data.error;
+            if (error.response && error.response.data) {
+                // Handle different error structures
+                msg = error.response.data.error || JSON.stringify(error.response.data);
             } 
             Alert.alert("Notice", msg, [{ text: "OK", onPress: () => navigation.goBack() }]);
         } finally {
@@ -158,14 +203,37 @@ const ApplyJobScreen = ({ route, navigation }) => {
                         {/* RESUME UPLOAD */}
                         <Text style={styles.sectionLabel}>RESUME</Text>
                         <TouchableOpacity 
-                            style={styles.fileBtn} 
-                            onPress={() => Alert.alert("Upload", "File picker requires native config.")}
+                            style={[
+                                styles.fileBtn, 
+                                resume && styles.fileBtnActive // Change style if file selected
+                            ]} 
+                            onPress={pickResume}
                             activeOpacity={0.8}
                         >
-                            <View style={styles.fileIconBox}>
-                                <Ionicons name="cloud-upload" size={20} color={palette.accent} />
+                            <View style={[
+                                styles.fileIconBox,
+                                resume && { backgroundColor: 'white' }
+                            ]}>
+                                <Ionicons 
+                                    name={resume ? "document-text" : "cloud-upload"} 
+                                    size={20} 
+                                    color={resume ? palette.success : palette.accent} 
+                                />
                             </View>
-                            <Text style={styles.fileText}>Click to upload Resume (PDF)</Text>
+                            <View style={{flex: 1}}>
+                                <Text style={[
+                                    styles.fileText,
+                                    resume && { color: 'white', fontWeight: '700' }
+                                ]}>
+                                    {resume ? resume.name : "Click to upload Resume (PDF)"}
+                                </Text>
+                                {resume && (
+                                    <Text style={{color: 'rgba(255,255,255,0.8)', fontSize: 10}}>
+                                        Tap to change
+                                    </Text>
+                                )}
+                            </View>
+                            {resume && <Ionicons name="checkmark-circle" size={24} color="white" />}
                         </TouchableOpacity>
 
                         {/* ACTIONS */}
@@ -262,12 +330,18 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top'
     },
 
-    // File Upload
+    // File Upload (Standard)
     fileBtn: { 
         borderWidth: 1.5, borderColor: palette.cardBorder, borderStyle: 'dashed', 
         borderRadius: 12, backgroundColor: palette.background, 
         height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 32
+        marginBottom: 32, paddingHorizontal: 15
+    },
+    // File Upload (Active/Selected)
+    fileBtnActive: {
+        backgroundColor: palette.success,
+        borderColor: palette.success,
+        borderStyle: 'solid'
     },
     fileIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: palette.accentSoft, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
     fileText: { color: palette.textSecondary, fontWeight: '600', fontSize: 13 },
