@@ -20,7 +20,7 @@ const ProfileScreen = ({ route, navigation }) => {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>My Profile</Text>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile', { user })}>
             <Ionicons name="pencil" size={14} color="white" />
             <Text style={styles.editBtnText}> Edit Profile</Text>
           </TouchableOpacity>
@@ -67,10 +67,10 @@ const ProfileScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.section}>
-             <Text style={styles.sectionTitle}>Skills</Text>
-             <Text style={styles.sectionContent}>
+              <Text style={styles.sectionTitle}>Skills</Text>
+              <Text style={styles.sectionContent}>
                 {user.skills ? user.skills : "No skills listed."}
-             </Text>
+              </Text>
           </View>
 
           {/* Resume Section */}
@@ -83,6 +83,23 @@ const ProfileScreen = ({ route, navigation }) => {
                 </Text>
             </View>
           </View>
+
+          {/* --- NEW JOB TITLE SECTION (Only Shows if Accepted) --- */}
+          {/* We check if status exists and is exactly 'Accepted' */}
+          {user.application_status === 'Accepted' && (
+            <View style={styles.jobBox}>
+                <View style={styles.jobIcon}>
+                    <Ionicons name="briefcase" size={24} color="white" />
+                </View>
+                <View style={{marginLeft: 15}}>
+                    <Text style={styles.jobLabel}>Current Position</Text>
+                    <Text style={styles.jobTitleText}>
+                        {user.job_title || "Position Title Not Set"}
+                    </Text>
+                </View>
+            </View>
+          )}
+          {/* --------------------------------------------------- */}
 
         </View>
       </View>
@@ -120,7 +137,38 @@ const styles = StyleSheet.create({
   contactItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
   contactText: { color: '#333' },
 
-  resumeBox: { backgroundColor: '#f8f9fa', padding: 15, borderRadius: 5, borderWidth: 1, borderColor: '#eee', flexDirection: 'row', alignItems: 'center' }
+  resumeBox: { backgroundColor: '#f8f9fa', padding: 15, borderRadius: 5, borderWidth: 1, borderColor: '#eee', flexDirection: 'row', alignItems: 'center' },
+
+  // --- NEW STYLES FOR JOB BOX ---
+  jobBox: { 
+      marginTop: 20, 
+      backgroundColor: '#d1e7dd', // Light green background
+      padding: 15, 
+      borderRadius: 8, 
+      borderWidth: 1, 
+      borderColor: '#badbcc',
+      flexDirection: 'row', 
+      alignItems: 'center' 
+  },
+  jobIcon: {
+      backgroundColor: '#198754', // Dark green
+      width: 40, 
+      height: 40, 
+      borderRadius: 20, 
+      justifyContent: 'center', 
+      alignItems: 'center'
+  },
+  jobLabel: {
+      color: '#0f5132', 
+      fontSize: 12, 
+      fontWeight: '600', 
+      textTransform: 'uppercase'
+  },
+  jobTitleText: {
+      color: '#0f5132', 
+      fontSize: 18, 
+      fontWeight: 'bold'
+  }
 });
 
 export default ProfileScreen;

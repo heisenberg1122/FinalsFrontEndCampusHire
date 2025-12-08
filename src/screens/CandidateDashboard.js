@@ -108,8 +108,8 @@ const CandidateDashboard = ({ route, navigation }) => {
                 
                 {/* --- NEW: Notification Button --- */}
                 <TouchableOpacity 
-                    style={[styles.iconBtn, { marginRight: 8 }]} 
-                    onPress={() => navigation.navigate('UserNotification', { user })}
+                  style={[styles.iconBtn, { marginRight: 8 }]} 
+                  onPress={() => navigation.navigate('Notifications', { user })}
                 >
                     <Ionicons name="notifications" size={26} color="white" />
                 </TouchableOpacity>

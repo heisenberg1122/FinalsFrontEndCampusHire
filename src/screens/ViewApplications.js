@@ -59,10 +59,16 @@ const ViewApplications = ({ navigation }) => {
         <View style={styles.headerRow}>
             <View style={{flex: 1}}>
                 <Text style={styles.name}>{item.applicant?.first_name} {item.applicant?.last_name}</Text>
-                <View style={styles.roleContainer}>
-                      <Ionicons name="briefcase-outline" size={14} color="#0d6efd" style={{marginRight: 4}}/>
-                      <Text style={styles.jobTitle}>{item.job?.title}</Text>
-                </View>
+                {item.status === 'Accepted' ? (
+                  <View style={{marginTop: 6}}>
+                    <Text style={styles.employedText}>Employed - ( {item.job?.title} )</Text>
+                  </View>
+                ) : (
+                  <View style={styles.roleContainer}>
+                        <Ionicons name="briefcase-outline" size={14} color="#0d6efd" style={{marginRight: 4}}/>
+                        <Text style={styles.jobTitle}>{item.job?.title}</Text>
+                  </View>
+                )}
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
                 <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status}</Text>
@@ -245,6 +251,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
   roleContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   jobTitle: { fontSize: 14, color: '#0d6efd', fontWeight: '600' },
+  employedText: { fontSize: 14, color: '#0d6efd', fontWeight: '700' },
   
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
