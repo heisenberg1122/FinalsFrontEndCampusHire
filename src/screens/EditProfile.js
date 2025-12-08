@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import api from '../api/config';
+import axios from 'axios'; // 1. Import Axios
+
+// 2. Define API URL
+const API_URL = 'https://finalsbackendcampushire.onrender.com';
 
 const EditProfile = ({ route, navigation }) => {
   const initialUser = route.params?.user;
@@ -9,6 +12,7 @@ const EditProfile = ({ route, navigation }) => {
 
   const [loading, setLoading] = useState(!initialUser && !!userId);
   const [saving, setSaving] = useState(false);
+  
   const [form, setForm] = useState({
     first_name: initialUser?.first_name || '',
     last_name: initialUser?.last_name || '',
@@ -18,22 +22,35 @@ const EditProfile = ({ route, navigation }) => {
     bio: initialUser?.bio || '',
     skills: initialUser?.skills || '',
   });
+
   const [image, setImage] = useState(initialUser?.profile_picture ? { uri: initialUser.profile_picture } : null);
+
+  // Helper to handle image display (Remote URL vs Local File)
+  const getDisplayUri = (uri) => {
+    if (!uri) return null;
+    if (uri.startsWith('file://') || uri.startsWith('content://')) return uri; // Local selection
+    if (uri.startsWith('http')) return uri; // Already full URL
+    return `${API_URL}${uri}`; // Relative server path
+  };
 
   useEffect(() => {
     if (!initialUser && userId) {
-      // fetch user
-      api.get(`/reg/api/users/${userId}/`)
+      // 3. Update Fetch Logic
+      axios.get(`${API_URL}/api/users/${userId}/`)
         .then(res => {
+          const data = res.data;
           setForm({
-            first_name: res.data.first_name || '',
-            last_name: res.data.last_name || '',
-            email: res.data.email || '',
-            phone_number: res.data.phone_number || '',
-            address: res.data.address || '',
-            bio: res.data.bio || '',
-            skills: res.data.skills || '',
+            first_name: data.first_name || '',
+            last_name: data.last_name || '',
+            email: data.email || '',
+            phone_number: data.phone_number || '',
+            address: data.address || '',
+            bio: data.bio || '',
+            skills: data.skills || '',
           });
+          if (data.profile_picture) {
+            setImage({ uri: data.profile_picture });
+          }
         })
         .catch(err => {
           console.log('Failed to load user', err);
@@ -44,15 +61,10 @@ const EditProfile = ({ route, navigation }) => {
   }, []);
 
   useEffect(() => {
-    // request permission for media library on mount (expo)
     (async () => {
-      try {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          console.log('Media library permission not granted');
-        }
-      } catch (e) {
-        console.log('Error requesting media permissions', e);
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'We need permission to access your photos.');
       }
     })();
   }, []);
@@ -65,18 +77,8 @@ const EditProfile = ({ route, navigation }) => {
         quality: 0.7,
       });
 
-      // Handle both old and new response shapes from expo-image-picker
-      // Newer versions return { canceled: boolean, assets: [{ uri, ... }] }
-      // Older versions return { cancelled: boolean, uri }
-      const canceled = result.canceled ?? result.cancelled;
-      if (!canceled) {
-        let pickedUri = null;
-        if (result.assets && result.assets.length > 0) {
-          pickedUri = result.assets[0].uri;
-        } else if (result.uri) {
-          pickedUri = result.uri;
-        }
-        if (pickedUri) setImage({ uri: pickedUri });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImage({ uri: result.assets[0].uri });
       }
     } catch (err) {
       console.log('Image pick error', err);
@@ -89,45 +91,55 @@ const EditProfile = ({ route, navigation }) => {
   const handleSave = () => {
     if (!userId) return Alert.alert('Error', 'Missing user id');
     setSaving(true);
-    // Use multipart/form-data if there's a newly picked local image, otherwise JSON
+
     const uri = image?.uri || null;
-    const isRemote = typeof uri === 'string' && (uri.startsWith('http') || uri.startsWith('/'));
-    const hasImage = typeof uri === 'string' && !isRemote;
-    if (hasImage) {
+    
+    // Check if the image is a new local file (starts with file:// or content://)
+    // If it starts with '/' or 'http', it's the old image from the server.
+    const isNewImage = uri && (uri.startsWith('file://') || uri.startsWith('content://'));
+
+    if (isNewImage) {
+      // --- MULTIPART REQUEST (Image Changed) ---
       const formData = new FormData();
       Object.keys(form).forEach(key => {
-        if (form[key] !== undefined && form[key] !== null) formData.append(key, form[key]);
+        if (form[key] !== undefined && form[key] !== null) {
+            formData.append(key, form[key]);
+        }
       });
 
-      // Safely determine file extension and mime type. If missing, default to jpg/jpeg.
       const uriParts = uri.split('.');
       const fileExt = uriParts.length > 1 ? uriParts[uriParts.length - 1].split('?')[0] : 'jpg';
-      const lowerExt = fileExt.toLowerCase();
-      const mimeType = lowerExt === 'jpg' || lowerExt === 'jpeg' ? 'image/jpeg' : `image/${lowerExt}`;
-
+      
       formData.append('profile_picture', {
         uri: uri,
         name: `profile.${fileExt}`,
-        type: mimeType,
+        type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
       });
 
-      api.put(`/reg/api/users/${userId}/`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-        .then(res => {
-          navigation.navigate('Profile', { user: res.data });
-        })
-        .catch(err => {
-          console.log('Save error', err.response || err.message || err);
-          Alert.alert('Save failed', 'Please try again');
-        })
-        .finally(() => setSaving(false));
+      // 4. Update PUT Logic (Multipart)
+      axios.put(`${API_URL}/api/users/${userId}/`, formData, {
+        headers: { 
+            'Content-Type': 'multipart/form-data',
+        },
+      })
+      .then(res => {
+        navigation.navigate('Profile', { user: res.data });
+      })
+      .catch(err => {
+        console.error('Save error:', err.response?.data || err.message);
+        Alert.alert('Save failed', 'Please try again');
+      })
+      .finally(() => setSaving(false));
+
     } else {
-      // plain JSON update
-      api.put(`/reg/api/users/${userId}/`, form)
+      // --- JSON REQUEST (No Image Change) ---
+      // 5. Update PUT Logic (JSON)
+      axios.put(`${API_URL}/api/users/${userId}/`, form)
         .then(res => {
           navigation.navigate('Profile', { user: res.data });
         })
         .catch(err => {
-          console.log('Save error', err.response || err.message || err);
+          console.error('Save error:', err.response?.data || err.message);
           Alert.alert('Save failed', 'Please try again');
         })
         .finally(() => setSaving(false));
@@ -147,7 +159,11 @@ const EditProfile = ({ route, navigation }) => {
 
         <TouchableOpacity onPress={pickImage} style={{alignSelf:'center', marginBottom:12}}>
           {image && image.uri ? (
-            <Image source={{ uri: image.uri }} style={{width:90,height:90,borderRadius:45}} />
+            <Image 
+                // Use the helper to determine if we show local or server URL
+                source={{ uri: getDisplayUri(image.uri) }} 
+                style={{width:90,height:90,borderRadius:45}} 
+            />
           ) : (
             <View style={{width:90,height:90,borderRadius:45,backgroundColor:'#eee',alignItems:'center',justifyContent:'center'}}>
               <Text style={{color:'#666'}}>Pick</Text>
@@ -177,7 +193,7 @@ const EditProfile = ({ route, navigation }) => {
         <TextInput value={form.skills} onChangeText={v=>handleChange('skills',v)} style={styles.input} />
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-          <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
+          {saving ? <ActivityIndicator color="white" /> : <Text style={styles.saveText}>Save Changes</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>

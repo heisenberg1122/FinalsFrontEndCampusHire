@@ -11,7 +11,7 @@ const ApplyJobScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false);
 
   // 🌐 AUTO-DETECT URL
-  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
+  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
   
   // Shared Background Image
   const BACKGROUND_IMAGE_URL = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
