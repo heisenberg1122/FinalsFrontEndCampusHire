@@ -7,28 +7,65 @@ import { Ionicons } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 
 const CandidateDashboard = ({ route, navigation }) => {
-  // Fallback if user param is missing
-  const { user } = route.params || { user: { first_name: 'Candidate', id: 0 } };
+  // --- FIX START: Safe Parameter Handling ---
+  // 1. Get params safely (defaults to empty object if route.params is null)
+  const params = route.params || {};
+
+  // 2. Get user safely (defaults to "Candidate" if user is missing from params)
+  // This prevents crashes if other screens send back params without the user object
+  const user = params.user || { 
+      first_name: 'Candidate', 
+      id: 0 
+  };
+  // --- FIX END ---
   
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // State for Red Dot
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false); 
 
   // 🌐 AUTO-DETECT URL
-  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
+  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
 
   // Shared Background Image
   const BACKGROUND_IMAGE_URL = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
 
+  // 1. Fetch Available Jobs
   const fetchJobs = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/jobs/`);
       setJobs(response.data);
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching jobs:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  // 2. UPDATED: Check for UNREAD Notifications
+  const checkNotifications = async () => {
+    if (!user || !user.id) return;
+
+    try {
+      // Fetch the exact same list your Notifications screen uses
+      const response = await axios.get(`${API_URL}/job/api/notifications/${user.id}/`);
+      
+      const notifications = response.data || [];
+
+      // Filter to find any that are NOT read
+      const unreadItems = notifications.filter(n => {
+        const isRead = (n.read !== undefined) ? n.read : (n.is_read !== undefined ? n.is_read : false);
+        return isRead === false;
+      });
+
+      // If we have any unread items, show the dot
+      setHasUnreadNotifications(unreadItems.length > 0);
+
+    } catch (error) {
+      console.error("Error checking notifications:", error);
     }
   };
 
@@ -36,10 +73,15 @@ const CandidateDashboard = ({ route, navigation }) => {
   useFocusEffect(
     useCallback(() => {
       fetchJobs();
+      checkNotifications(); 
     }, [])
   );
 
-  const onRefresh = () => { setRefreshing(true); fetchJobs(); };
+  const onRefresh = () => { 
+      setRefreshing(true); 
+      fetchJobs(); 
+      checkNotifications(); 
+  };
 
   const handleApply = (item) => {
       if (item.status !== 'Open') {
@@ -85,7 +127,7 @@ const CandidateDashboard = ({ route, navigation }) => {
           activeOpacity={0.8}
         >
           <Text style={styles.applyButtonText}>
-             {isOpen ? 'Apply Now' : 'Position Closed'}
+              {isOpen ? 'Apply Now' : 'Position Closed'}
           </Text>
           {isOpen && <Ionicons name="arrow-forward" size={16} color="white" style={{marginLeft: 5}}/>}
         </TouchableOpacity>
@@ -106,12 +148,19 @@ const CandidateDashboard = ({ route, navigation }) => {
             </View>
             <View style={styles.headerActions}>
                 
-                {/* --- NEW: Notification Button --- */}
+                {/* --- NOTIFICATION BUTTON --- */}
                 <TouchableOpacity 
-                  style={[styles.iconBtn, { marginRight: 8 }]} 
-                  onPress={() => navigation.navigate('Notifications', { user })}
+                  style={[styles.iconBtn, { marginRight: 8, position: 'relative' }]} 
+                  onPress={() => {
+                      navigation.navigate('Notifications', { user });
+                  }}
                 >
                     <Ionicons name="notifications" size={26} color="white" />
+                    
+                    {/* RED DOT: Only shows if hasUnreadNotifications is true */}
+                    {hasUnreadNotifications && (
+                        <View style={styles.notificationDot} />
+                    )}
                 </TouchableOpacity>
 
                 {/* Profile Button */}
@@ -180,6 +229,20 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { padding: 5 },
 
+  // --- RED DOT STYLE ---
+  notificationDot: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ff3b30', // System Red
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.1)',
+    zIndex: 10,
+  },
+
   // Banner
   bannerContainer: { paddingHorizontal: 20, marginBottom: 10 },
   bannerGlass: {
@@ -189,7 +252,7 @@ const styles = StyleSheet.create({
   bannerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
   bannerSub: { color: '#f0f0f0', marginTop: 5, fontSize: 13 },
 
-  // Job Card (Glassmorphism)
+  // Job Card
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16, padding: 20, marginBottom: 20,
@@ -205,7 +268,7 @@ const styles = StyleSheet.create({
 
   description: { color: '#666', marginBottom: 15, lineHeight: 20, fontSize: 14 },
 
-  // Meta Data (Salary/Slots)
+  // Meta Data
   metaRow: { flexDirection: 'row', marginBottom: 15, backgroundColor: '#f8f9fa', padding: 10, borderRadius: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
   metaText: { color: '#333', fontWeight: '600', marginLeft: 6, fontSize: 13 },

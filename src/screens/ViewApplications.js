@@ -12,7 +12,7 @@ const ViewApplications = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   // 🌐 AUTO-DETECT URL
-  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000';
+  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
 
   // Shared Background
   const BACKGROUND_IMAGE_URL = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
@@ -24,7 +24,6 @@ const ViewApplications = ({ navigation }) => {
       setApplications(response.data);
     } catch (error) {
       console.log(error);
-      // Silent fail on console, but could alert user if needed
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -40,6 +39,33 @@ const ViewApplications = ({ navigation }) => {
 
   const onRefresh = () => { setRefreshing(true); fetchApplications(); };
 
+  // --- DELETE FUNCTION ---
+  const handleDeleteApplication = (id) => {
+    Alert.alert(
+        "Delete Application",
+        "Are you sure you want to delete this accepted applicant? This cannot be undone.",
+        [
+            { text: "Cancel", style: "cancel" },
+            { 
+                text: "Delete", 
+                style: "destructive", 
+                onPress: async () => {
+                    try {
+                        // Assuming your backend supports DELETE on /job/api/applications/<id>/
+                        await axios.delete(`${API_URL}/job/api/applications/${id}/`);
+                        // Remove from UI immediately
+                        setApplications(prev => prev.filter(app => app.id !== id));
+                        Alert.alert("Success", "Application deleted.");
+                    } catch (error) {
+                        console.error("Delete failed", error);
+                        Alert.alert("Error", "Failed to delete application.");
+                    }
+                }
+            }
+        ]
+    );
+  };
+
   // --- HELPER: Get Color based on Status ---
   const getStatusStyle = (status) => {
       switch(status) {
@@ -52,6 +78,7 @@ const ViewApplications = ({ navigation }) => {
 
   const renderItem = ({ item }) => {
     const statusStyle = getStatusStyle(item.status);
+    const isAccepted = item.status === 'Accepted';
 
     return (
       <View style={styles.card}>
@@ -59,7 +86,7 @@ const ViewApplications = ({ navigation }) => {
         <View style={styles.headerRow}>
             <View style={{flex: 1}}>
                 <Text style={styles.name}>{item.applicant?.first_name} {item.applicant?.last_name}</Text>
-                {item.status === 'Accepted' ? (
+                {isAccepted ? (
                   <View style={{marginTop: 6}}>
                     <Text style={styles.employedText}>Employed - ( {item.job?.title} )</Text>
                   </View>
@@ -101,14 +128,26 @@ const ViewApplications = ({ navigation }) => {
             </View>
           )}
 
-          <TouchableOpacity 
-            style={[styles.btn, styles.scheduleBtn]} 
-            onPress={() => handleSchedule(item)}
-            activeOpacity={0.8}
-          >
-              <Ionicons name="calendar" size={16} color="white" />
-              <Text style={styles.btnText}>Schedule</Text>
-          </TouchableOpacity>
+          {/* TOGGLE BUTTON: If Accepted -> Show Delete. Else -> Show Schedule */}
+          {isAccepted ? (
+             <TouchableOpacity 
+                style={[styles.btn, styles.deleteBtn]} 
+                onPress={() => handleDeleteApplication(item.id)}
+                activeOpacity={0.8}
+             >
+                <Ionicons name="trash-outline" size={16} color="white" />
+                <Text style={styles.btnText}>Delete</Text>
+             </TouchableOpacity>
+          ) : (
+             <TouchableOpacity 
+               style={[styles.btn, styles.scheduleBtn]} 
+               onPress={() => handleSchedule(item)}
+               activeOpacity={0.8}
+             >
+                 <Ionicons name="calendar" size={16} color="white" />
+                 <Text style={styles.btnText}>Schedule</Text>
+             </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -152,20 +191,18 @@ const ViewApplications = ({ navigation }) => {
       <View style={styles.overlay}>
         <StatusBar barStyle="light-content" />
 
-        {/* --- MODIFIED HEADER --- */}
+        {/* --- HEADER --- */}
         <View style={styles.header}>
-            {/* Back Button */}
-             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                 <View style={styles.iconCircle}>
                     <Ionicons name="chevron-back" size={24} color="white" />
                 </View>
                 <Text style={styles.headerTitle}>Applications</Text>
             </TouchableOpacity>
 
-            {/* NEW: Admin Pending Button */}
             <TouchableOpacity 
                 style={styles.pendingBtn}
-                onPress={() => navigation.navigate('AdminPending')} // Ensures navigation to the specific screen
+                onPress={() => navigation.navigate('AdminPending')} 
                 activeOpacity={0.7}
             >
                 <Text style={styles.pendingBtnText}>Pending</Text>
@@ -204,7 +241,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', 
     alignItems: 'center',
-    justifyContent: 'space-between', // Pushes items to edges
+    justifyContent: 'space-between', 
     paddingHorizontal: 20, 
     paddingTop: Platform.OS === 'ios' ? 60 : 45, 
     paddingBottom: 15,
@@ -216,11 +253,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 24, fontWeight: '800', color: 'white' },
 
-  // --- NEW BUTTON STYLES ---
   pendingBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.2)', // Glass effect
+      backgroundColor: 'rgba(255, 255, 255, 0.2)', 
       paddingVertical: 8,
       paddingHorizontal: 12,
       borderRadius: 20,
@@ -241,7 +277,7 @@ const styles = StyleSheet.create({
 
   // --- Card (Glassmorphism) ---
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // High opacity white
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
     borderRadius: 16, padding: 20, marginBottom: 15,
     shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 4
   },
@@ -269,6 +305,8 @@ const styles = StyleSheet.create({
   
   resumeBtn: { backgroundColor: '#0d6efd' }, // Blue
   scheduleBtn: { backgroundColor: '#fd7e14' }, // Orange
+  deleteBtn: { backgroundColor: '#dc3545' }, // Red (New Style)
+  noResumeBtn: { backgroundColor: '#adb5bd' },
 });
 
 export default ViewApplications;
