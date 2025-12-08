@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import axios from 'axios'; // 1. Import Axios
+import axios from 'axios'; 
 
-// 2. Define API URL
 const API_URL = 'https://finalsbackendcampushire.onrender.com';
 
 const EditProfile = ({ route, navigation }) => {
@@ -25,18 +24,17 @@ const EditProfile = ({ route, navigation }) => {
 
   const [image, setImage] = useState(initialUser?.profile_picture ? { uri: initialUser.profile_picture } : null);
 
-  // Helper to handle image display (Remote URL vs Local File)
   const getDisplayUri = (uri) => {
     if (!uri) return null;
-    if (uri.startsWith('file://') || uri.startsWith('content://')) return uri; // Local selection
-    if (uri.startsWith('http')) return uri; // Already full URL
-    return `${API_URL}${uri}`; // Relative server path
+    if (uri.startsWith('file://') || uri.startsWith('content://')) return uri; 
+    if (uri.startsWith('http')) return uri; 
+    return `${API_URL}${uri}`; 
   };
 
   useEffect(() => {
     if (!initialUser && userId) {
-      // 3. Update Fetch Logic
-      axios.get(`${API_URL}/api/users/${userId}/`)
+      // FIX 1: Added "/reg/" to match your backend structure
+      axios.get(`${API_URL}/reg/api/users/${userId}/`)
         .then(res => {
           const data = res.data;
           setForm({
@@ -72,7 +70,7 @@ const EditProfile = ({ route, navigation }) => {
   const pickImage = async () => {
     try {
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images, // Corrected Syntax
         allowsEditing: true,
         quality: 0.7,
       });
@@ -93,9 +91,6 @@ const EditProfile = ({ route, navigation }) => {
     setSaving(true);
 
     const uri = image?.uri || null;
-    
-    // Check if the image is a new local file (starts with file:// or content://)
-    // If it starts with '/' or 'http', it's the old image from the server.
     const isNewImage = uri && (uri.startsWith('file://') || uri.startsWith('content://'));
 
     if (isNewImage) {
@@ -116,12 +111,9 @@ const EditProfile = ({ route, navigation }) => {
         type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
       });
 
-      // 4. Update PUT Logic (Multipart)
-      axios.put(`${API_URL}/api/users/${userId}/`, formData, {
-        headers: { 
-            'Content-Type': 'multipart/form-data',
-        },
-      })
+      // FIX 2: Added "/reg/" here as well
+      // Note: No manual 'Content-Type' header needed
+      axios.put(`${API_URL}/reg/api/users/${userId}/`, formData)
       .then(res => {
         navigation.navigate('Profile', { user: res.data });
       })
@@ -133,8 +125,8 @@ const EditProfile = ({ route, navigation }) => {
 
     } else {
       // --- JSON REQUEST (No Image Change) ---
-      // 5. Update PUT Logic (JSON)
-      axios.put(`${API_URL}/api/users/${userId}/`, form)
+      // FIX 3: Added "/reg/" here as well
+      axios.put(`${API_URL}/reg/api/users/${userId}/`, form)
         .then(res => {
           navigation.navigate('Profile', { user: res.data });
         })
@@ -160,7 +152,6 @@ const EditProfile = ({ route, navigation }) => {
         <TouchableOpacity onPress={pickImage} style={{alignSelf:'center', marginBottom:12}}>
           {image && image.uri ? (
             <Image 
-                // Use the helper to determine if we show local or server URL
                 source={{ uri: getDisplayUri(image.uri) }} 
                 style={{width:90,height:90,borderRadius:45}} 
             />
