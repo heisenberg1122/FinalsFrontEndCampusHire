@@ -1,429 +1,478 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert, ImageBackground, Dimensions, StatusBar, Modal, ScrollView, Linking } from 'react-native';
+import { 
+    View, 
+    Text, 
+    FlatList, 
+    TouchableOpacity, 
+    StyleSheet, 
+    ActivityIndicator, 
+    Platform, 
+    Alert, 
+    ImageBackground, 
+    Dimensions, 
+    StatusBar, 
+    Modal, 
+    ScrollView, 
+    Linking,
+    useWindowDimensions
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
+// --- SHARED DESIGN PALETTE ---
+const palette = {
+    surface: "#FFFFFF",
+    background: "#F8FAFC",
+    textPrimary: "#1E293B",
+    textSecondary: "#64748B",
+    accent: "#3B82F6",
+    accentSoft: "rgba(59, 130, 246, 0.1)",
+    success: "#10B981",
+    successSoft: "#D1FAE5",
+    danger: "#EF4444",
+    dangerSoft: "#FEE2E2",
+    warning: "#F59E0B",
+    warningSoft: "#FEF3C7",
+    cardBorder: "#E2E8F0",
+    iconNeutral: "#94A3B8"
+};
+
 const AdminPending = ({ navigation }) => {
-  // --- STATE ---
-  const [pendingApps, setPendingApps] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false); // <--- NEW: To track sending status
-  
-  // Modal State
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedApp, setSelectedApp] = useState(null);
+    const { width: screenWidth } = useWindowDimensions();
+    const isDesktop = screenWidth > 768;
 
-  // --- CONFIG ---
-  // 🌐 Auto-detect URL (Adjust if using real device)
-  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
-  const BACKGROUND_IMAGE_URL = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
-
-  // --- API: FETCH APPLICATIONS ---
-  const fetchPending = async () => {
-    try {
-      setLoading(true);
-      // Ensure this endpoint matches your urls.py list view
-      const response = await axios.get(`${API_URL}/job/api/applications/`);
-        
-      if (Array.isArray(response.data)) {
-        // Filter only 'Pending' status
-        const pending = response.data.filter(app => app.status === 'Pending');
-        setPendingApps(pending);
-      } else {
-        setPendingApps([]);
-      }
-    } catch (error) {
-      console.error("Error fetching pending:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchPending();
-    }, [])
-  );
-
-  // --- API: SUBMIT REVIEW (Accept/Reject) ---
-  const submitReview = async (applicationId, actionType) => {
-    if (isSubmitting) return; // Stop if already working
-    setIsSubmitting(true);    // Lock buttons
-
-    const targetUrl = `${API_URL}/job/review/${applicationId}/`;
+    // --- STATE ---
+    const [pendingApps, setPendingApps] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false); 
     
-    console.log(`Processing ${actionType} for ID: ${applicationId}...`);
+    // Modal State
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedApp, setSelectedApp] = useState(null);
 
-    try {
-      // 1. Send POST request
-      const response = await axios.post(targetUrl, {
-        action: actionType // sends 'accept' or 'reject'
-      }, {
-        validateStatus: () => true
-      });
+    // --- CONFIG ---
+    const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
+    const HEADER_BG = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop';
 
-      console.log("Review response:", response.status);
-
-      if (response.status >= 200 && response.status < 300) {
-        // 2. Success Feedback
-        setModalVisible(false);
-        setPendingApps(prevApps => prevApps.filter(app => app.id !== applicationId));
-
-        // --- CUSTOM ALERT MESSAGES ---
-        if (actionType === 'accept') {
-            Alert.alert(
-                "Success! 🎉", 
-                "Application Accepted.\n\nThe applicant has been notified successfully."
-            );
-        } else {
-            Alert.alert(
-                "Rejected", 
-                "Application has been rejected and the applicant has been notified."
-            );
-        }
-      } else {
-        // Not a success status
-        const msg = response.data?.error || response.data?.message || JSON.stringify(response.data);
-        Alert.alert("Server Error", `Status: ${response.status}\nMessage: ${msg}`);
-      }
-
-    } catch (error) {
-      console.error("Review failed full error:", error);
-      Alert.alert("Network Error", "Server is not responding.");
-    } finally {
-      setIsSubmitting(false); // Unlock buttons
-    }
-  };
-
-  // --- ACTION HANDLERS ---
-
-  const handleOpenResume = (url) => {
-    if (!url) {
-      Alert.alert("No Resume", "This applicant did not upload a resume.");
-      return;
-    }
-
-    let finalUrl = url;
-    if (!/^https?:\/\//i.test(url)) {
-      const base = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
-      const path = url.startsWith('/') ? url : '/' + url;
-      finalUrl = `${base}${path}`;
-    }
-
-    Linking.canOpenURL(finalUrl).then((supported) => {
-      if (supported) {
-        Linking.openURL(finalUrl).catch(err => Alert.alert("Error", "Cannot open resume link."));
-      } else {
-        Alert.alert("Error", "Cannot open resume link.");
-      }
-    }).catch(err => {
-      console.log('canOpenURL error', err);
-      Alert.alert('Error', 'Cannot open resume link.');
-    });
-  };
-
-  const handleDecision = (actionType) => {
-    Alert.alert(
-      `Confirm ${actionType === 'accept' ? 'Accept' : 'Reject'}`,
-      `Are you sure you want to ${actionType} this applicant? A notification will be sent immediately.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Confirm", 
-          onPress: () => submitReview(selectedApp.id, actionType)
-        }
-      ]
-    );
-  };
-
-  const handleScheduleInterview = () => {
-    setModalVisible(false);
-    navigation.navigate('ScheduleInterview', { 
-      applicationId: selectedApp.id,
-      applicantName: selectedApp.applicant?.first_name 
-    });
-  };
-
-  const openReviewModal = (item) => {
-    setSelectedApp(item);
-    setModalVisible(true);
-  };
-
-  // --- RENDER ITEM ---
-  const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={{flex: 1}}>
-          <Text style={styles.name}>
-            {item.applicant?.first_name || "Unknown"} {item.applicant?.last_name || ""}
-          </Text>
-          <Text style={styles.jobTitle}>{item.job?.title || "Unknown Job"}</Text>
-        </View>
-        <View style={styles.pendingBadge}>
-          <Text style={styles.pendingText}>Pending</Text>
-        </View>
-      </View>
-
-      <Text style={styles.email} numberOfLines={1}>{item.applicant?.email}</Text>
-
-      <TouchableOpacity 
-        style={styles.reviewBtn} 
-        onPress={() => openReviewModal(item)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.reviewBtnText}>Review Application</Text>
-        <Ionicons name="arrow-forward" size={16} color="white" />
-      </TouchableOpacity>
-    </View>
-  );
-
-  return (
-    <ImageBackground source={{ uri: BACKGROUND_IMAGE_URL }} style={styles.backgroundImage} resizeMode="cover">
-      <View style={styles.overlay}>
-        <StatusBar barStyle="light-content" />
-        
-        {/* HEADER */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pending Approvals</Text>
-        </View>
-
-        {/* LIST */}
-        {loading ? (
-          <ActivityIndicator size="large" color="#fff" style={{marginTop: 50}} />
-        ) : (
-          <FlatList
-            data={pendingApps}
-            keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="checkmark-done-circle-outline" size={60} color="white" opacity={0.8} />
-                <Text style={{color:'white', marginTop: 10, fontSize: 16}}>No pending applications.</Text>
-              </View>
+    // --- API: FETCH APPLICATIONS ---
+    const fetchPending = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get(`${API_URL}/job/api/applications/`);
+            if (Array.isArray(response.data)) {
+                const pending = response.data.filter(app => app.status === 'Pending');
+                setPendingApps(pending);
+            } else {
+                setPendingApps([]);
             }
-          />
-        )}
+        } catch (error) {
+            console.error("Error fetching pending:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        {/* --- DETAILED REVIEW MODAL --- */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              {/* Modal Header */}
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Application Details</Text>
-                {/* Disable close button if submitting */}
-                <TouchableOpacity onPress={() => !isSubmitting && setModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={isSubmitting ? "#ccc" : "#333"} />
-                </TouchableOpacity>
-              </View>
+    useFocusEffect(
+        useCallback(() => {
+            fetchPending();
+        }, [])
+    );
 
-              <ScrollView style={styles.modalScroll}>
-                {selectedApp && (
-                  <>
-                    {/* Profile Section */}
-                    <View style={styles.section}>
-                      <View style={styles.profileRow}>
-                        <View style={styles.avatarPlaceholder}>
-                          <Text style={styles.avatarText}>{selectedApp.applicant?.first_name?.[0] || "U"}</Text>
-                        </View>
-                        <View style={{flex: 1}}>
-                          <Text style={styles.profileName}>{selectedApp.applicant?.first_name} {selectedApp.applicant?.last_name}</Text>
-                          <Text style={styles.profileJob}>Applied for: <Text style={{fontWeight:'bold', color: '#0d6efd'}}>{selectedApp.job?.title}</Text></Text>
-                        </View>
-                      </View>
-                                          
-                      <View style={styles.infoGrid}>
-                        <View style={styles.infoItem}>
-                          <Ionicons name="mail-outline" size={16} color="#666" />
-                          <Text style={styles.infoText}>{selectedApp.applicant?.email || "N/A"}</Text>
-                        </View>
-                        <View style={styles.infoItem}>
-                          <Ionicons name="call-outline" size={16} color="#666" />
-                          <Text style={styles.infoText}>{selectedApp.applicant?.phone || "No Phone"}</Text>
-                        </View>
-                      </View>
-                    </View>
+    // --- API: SUBMIT REVIEW ---
+    const submitReview = async (applicationId, actionType) => {
+        if (isSubmitting) return; 
+        setIsSubmitting(true); 
 
-                    {/* Resume Section */}
-                    <Text style={styles.sectionTitle}>Documents</Text>
-                    <View style={styles.section}>
-                      <TouchableOpacity 
-                        style={styles.docButton} 
-                        onPress={() => handleOpenResume(selectedApp.resume)}
-                      >
-                        <Ionicons name="document-text" size={20} color="#dc3545" />
-                        <Text style={styles.docButtonText}>View PDF Resume</Text>
-                        <Ionicons name="open-outline" size={16} color="#666" />
-                      </TouchableOpacity>
-                    </View>
+        const targetUrl = `${API_URL}/job/review/${applicationId}/`;
+        
+        try {
+            const response = await axios.post(targetUrl, {
+                action: actionType 
+            }, { validateStatus: () => true });
 
-                    {/* Cover Letter Section */}
-                    <Text style={styles.sectionTitle}>Cover Letter</Text>
-                    <View style={styles.section}>
-                      <Text style={styles.coverLetterText}>
-                        {selectedApp.cover_letter 
-                          ? selectedApp.cover_letter 
-                          : "No cover letter provided by the applicant."}
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </ScrollView>
+            if (response.status >= 200 && response.status < 300) {
+                setModalVisible(false);
+                setPendingApps(prevApps => prevApps.filter(app => app.id !== applicationId));
 
-              {/* Modal Footer (ACTIONS) */}
-              <View style={styles.modalFooter}>
-                {/* Schedule Button */}
-                <TouchableOpacity 
-                  style={[styles.scheduleFullBtn, isSubmitting && {opacity: 0.6}]} 
-                  onPress={handleScheduleInterview}
-                  disabled={isSubmitting}
-                >
-                  <Ionicons name="calendar" size={18} color="white" />
-                  <Text style={styles.footerBtnText}>Schedule Interview</Text>
-                </TouchableOpacity>
+                if (actionType === 'accept') {
+                    Alert.alert("Success! 🎉", "Application Accepted. Applicant notified.");
+                } else {
+                    Alert.alert("Rejected", "Application rejected. Applicant notified.");
+                }
+            } else {
+                const msg = response.data?.error || response.data?.message || JSON.stringify(response.data);
+                Alert.alert("Server Error", `Status: ${response.status}\nMessage: ${msg}`);
+            }
 
-                <View style={styles.decisionRow}>
-                  {/* Reject Button */}
-                  <TouchableOpacity 
-                    style={[styles.decisionBtn, styles.rejectBtn, isSubmitting && {opacity: 0.6}]} 
-                    onPress={() => handleDecision('reject')}
-                    disabled={isSubmitting}
-                  >
-                    <Ionicons name="close-circle" size={18} color="white" style={{marginRight: 5}}/>
-                    <Text style={styles.footerBtnText}>Reject</Text>
-                  </TouchableOpacity>
-                                
-                  {/* Accept Button */}
-                  <TouchableOpacity 
-                    style={[styles.decisionBtn, styles.acceptBtn, isSubmitting && {opacity: 0.6}]} 
-                    onPress={() => handleDecision('accept')}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={18} color="white" style={{marginRight: 5}}/>
-                        <Text style={styles.footerBtnText}>Accept</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+        } catch (error) {
+            Alert.alert("Network Error", "Server is not responding.");
+        } finally {
+            setIsSubmitting(false); 
+        }
+    };
+
+    // --- ACTION HANDLERS ---
+    const handleOpenResume = (url) => {
+        if (!url) {
+            Alert.alert("No Resume", "This applicant did not upload a resume.");
+            return;
+        }
+        let finalUrl = url;
+        if (!/^https?:\/\//i.test(url)) {
+            const base = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+            const path = url.startsWith('/') ? url : '/' + url;
+            finalUrl = `${base}${path}`;
+        }
+        Linking.openURL(finalUrl).catch(err => Alert.alert("Error", "Cannot open resume link."));
+    };
+
+    const handleDecision = (actionType) => {
+        Alert.alert(
+            `Confirm ${actionType === 'accept' ? 'Accept' : 'Reject'}`,
+            `Are you sure you want to ${actionType} this applicant? A notification will be sent immediately.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Confirm", 
+                    style: actionType === 'accept' ? "default" : "destructive",
+                    onPress: () => submitReview(selectedApp.id, actionType)
+                }
+            ]
+        );
+    };
+
+    const handleScheduleInterview = () => {
+        setModalVisible(false);
+        navigation.navigate('ScheduleInterview', { 
+            applicationId: selectedApp.id,
+            applicantName: selectedApp.applicant?.first_name 
+        });
+    };
+
+    const openReviewModal = (item) => {
+        setSelectedApp(item);
+        setModalVisible(true);
+    };
+
+    const renderItem = ({ item }) => (
+        <View style={[styles.card, isDesktop && { width: '48%', marginRight: '2%' }]}>
+            {/* Header: Name & Job */}
+            <View style={styles.cardHeader}>
+                <View style={{flex: 1}}>
+                    <Text style={styles.applicantName}>
+                        {item.applicant?.first_name || "Unknown"} {item.applicant?.last_name || ""}
+                    </Text>
+                    <Text style={styles.jobTitle}>{item.job?.title || "Unknown Job"}</Text>
                 </View>
-              </View>
+                <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingText}>PENDING</Text>
+                </View>
             </View>
-          </View>
-        </Modal>
 
-      </View>
-    </ImageBackground>
-  );
+            <Text style={styles.email} numberOfLines={1}>{item.applicant?.email}</Text>
+
+            {/* Review Button */}
+            <TouchableOpacity 
+                style={styles.reviewBtn} 
+                onPress={() => openReviewModal(item)}
+                activeOpacity={0.9}
+            >
+                <Text style={styles.reviewBtnText}>Review Application</Text>
+                <Ionicons name="arrow-forward" size={16} color="white" />
+            </TouchableOpacity>
+        </View>
+    );
+
+    return (
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+            {/* 1. Header Background */}
+            <ImageBackground source={{ uri: HEADER_BG }} style={styles.headerBackground}>
+                <View style={styles.headerOverlay}>
+                    <SafeAreaView edges={['top']} style={styles.safeArea}>
+                        <View style={[styles.topNav, { paddingHorizontal: isDesktop ? 32 : 24 }]}>
+                            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navLeft}>
+                                <View style={styles.iconBtn}>
+                                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                                </View>
+                                <View>
+                                    <Text style={styles.screenLabel}>TASK LIST</Text>
+                                    <Text style={styles.screenTitle}>Pending Approvals</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    </SafeAreaView>
+                </View>
+            </ImageBackground>
+
+            {/* 2. Floating Sheet Surface */}
+            <View style={styles.surface}>
+                {loading ? (
+                    <View style={styles.centerLoading}>
+                        <ActivityIndicator size="large" color={palette.accent} />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={pendingApps}
+                        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+                        renderItem={renderItem}
+                        numColumns={isDesktop ? 2 : 1}
+                        key={isDesktop ? 'h' : 'v'}
+                        contentContainerStyle={[
+                            styles.listContent,
+                            { paddingHorizontal: isDesktop ? 32 : 20 }
+                        ]}
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <View style={styles.emptyIconCircle}>
+                                    <Ionicons name="checkmark-done-circle-outline" size={40} color={palette.success} />
+                                </View>
+                                <Text style={styles.emptyTitle}>All Caught Up!</Text>
+                                <Text style={styles.emptySub}>No pending applications to review.</Text>
+                            </View>
+                        }
+                    />
+                )}
+            </View>
+
+            {/* --- DETAILED REVIEW MODAL --- */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, isDesktop && { width: '50%', alignSelf: 'center' }]}>
+                        {/* Modal Header */}
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Application Review</Text>
+                            <TouchableOpacity onPress={() => !isSubmitting && setModalVisible(false)}>
+                                <Ionicons name="close" size={24} color={palette.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalScroll}>
+                            {selectedApp && (
+                                <>
+                                    {/* Profile Section */}
+                                    <View style={styles.section}>
+                                        <View style={styles.profileRow}>
+                                            <View style={styles.avatarPlaceholder}>
+                                                <Text style={styles.avatarText}>{selectedApp.applicant?.first_name?.[0] || "U"}</Text>
+                                            </View>
+                                            <View style={{flex: 1}}>
+                                                <Text style={styles.profileName}>{selectedApp.applicant?.first_name} {selectedApp.applicant?.last_name}</Text>
+                                                <Text style={styles.profileJob}>Applied for: <Text style={{fontWeight:'bold', color: palette.accent}}>{selectedApp.job?.title}</Text></Text>
+                                            </View>
+                                        </View>
+                                        
+                                        <View style={styles.infoGrid}>
+                                            <View style={styles.infoItem}>
+                                                <Ionicons name="mail-outline" size={16} color={palette.iconNeutral} />
+                                                <Text style={styles.infoText}>{selectedApp.applicant?.email || "N/A"}</Text>
+                                            </View>
+                                            <View style={styles.infoItem}>
+                                                <Ionicons name="call-outline" size={16} color={palette.iconNeutral} />
+                                                <Text style={styles.infoText}>{selectedApp.applicant?.phone || "No Phone"}</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* Resume Section */}
+                                    <Text style={styles.sectionLabel}>DOCUMENTS</Text>
+                                    <View style={styles.section}>
+                                        <TouchableOpacity 
+                                            style={styles.docButton} 
+                                            onPress={() => handleOpenResume(selectedApp.resume)}
+                                        >
+                                            <View style={{flexDirection:'row', alignItems:'center'}}>
+                                                <View style={styles.pdfIconBox}>
+                                                    <Ionicons name="document-text" size={20} color={palette.danger} />
+                                                </View>
+                                                <Text style={styles.docButtonText}>View Applicant Resume</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={16} color={palette.iconNeutral} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Cover Letter */}
+                                    <Text style={styles.sectionLabel}>COVER LETTER</Text>
+                                    <View style={[styles.section, {minHeight: 100}]}>
+                                        <Text style={styles.coverLetterText}>
+                                            {selectedApp.cover_letter 
+                                                ? selectedApp.cover_letter 
+                                                : "No cover letter provided by the applicant."}
+                                        </Text>
+                                    </View>
+                                    <View style={{height: 20}} />
+                                </>
+                            )}
+                        </ScrollView>
+
+                        {/* Modal Footer (ACTIONS) */}
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity 
+                                style={[styles.scheduleFullBtn, isSubmitting && {opacity: 0.6}]} 
+                                onPress={handleScheduleInterview}
+                                disabled={isSubmitting}
+                            >
+                                <Ionicons name="calendar" size={18} color="white" style={{marginRight: 6}} />
+                                <Text style={styles.footerBtnText}>Schedule Interview</Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.decisionRow}>
+                                <TouchableOpacity 
+                                    style={[styles.decisionBtn, styles.rejectBtn, isSubmitting && {opacity: 0.6}]} 
+                                    onPress={() => handleDecision('reject')}
+                                    disabled={isSubmitting}
+                                >
+                                    <Ionicons name="close-circle" size={18} color={palette.danger} style={{marginRight: 6}}/>
+                                    <Text style={[styles.footerBtnText, {color: palette.danger}]}>Reject</Text>
+                                </TouchableOpacity>
+                                                
+                                <TouchableOpacity 
+                                    style={[styles.decisionBtn, styles.acceptBtn, isSubmitting && {opacity: 0.6}]} 
+                                    onPress={() => handleDecision('accept')}
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? (
+                                        <ActivityIndicator color="#fff" size="small" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="checkmark-circle" size={18} color="white" style={{marginRight: 6}}/>
+                                            <Text style={styles.footerBtnText}>Accept</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
-  backgroundImage: { flex: 1, width: width, height: height },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  
-  // Header
-  header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 50 },
-  backBtn: { marginRight: 15, padding: 5 },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: 'white' },
-  
-  listContent: { padding: 20 },
-  emptyState: { alignItems: 'center', marginTop: 100 },
+    container: { flex: 1, backgroundColor: palette.background },
 
-  // --- List Item Card ---
-  card: { 
-      backgroundColor: 'rgba(255,255,255,0.95)', 
-      borderRadius: 16, 
-      padding: 16, 
-      marginBottom: 15,
-      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
-  },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  name: { fontSize: 17, fontWeight: '700', color: '#222' },
-  jobTitle: { fontSize: 13, color: '#0d6efd', fontWeight: '600', marginTop: 2 },
-  pendingBadge: { backgroundColor: '#fff3cd', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
-  pendingText: { fontSize: 10, fontWeight: 'bold', color: '#856404', textTransform: 'uppercase' },
-  email: { color: '#666', fontSize: 13, marginTop: 8, marginBottom: 12 },
-  
-  reviewBtn: {
-      backgroundColor: '#212529',
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8
-  },
-  reviewBtnText: { color: 'white', fontWeight: '600', fontSize: 13 },
+    // --- Header ---
+    headerBackground: { height: height * 0.22, width: '100%' },
+    headerOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.9)' },
+    safeArea: { flex: 1 },
+    topNav: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
+    navLeft: { flexDirection: 'row', alignItems: 'center' },
+    iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+    
+    screenLabel: { color: palette.iconNeutral, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+    screenTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '800' },
 
-  // --- MODAL STYLES ---
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { 
-      backgroundColor: '#f8f9fa', 
-      borderTopLeftRadius: 20, borderTopRightRadius: 20, 
-      height: '85%', 
-      paddingBottom: 30
-  },
-  modalHeader: { 
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
-      padding: 20, borderBottomWidth: 1, borderBottomColor: '#e9ecef', backgroundColor: 'white',
-      borderTopLeftRadius: 20, borderTopRightRadius: 20
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalScroll: { padding: 20 },
+    // --- Surface ---
+    surface: { 
+        flex: 1, 
+        backgroundColor: palette.background, 
+        borderTopLeftRadius: 30, 
+        borderTopRightRadius: 30, 
+        marginTop: -30, 
+        overflow: 'hidden' 
+    },
+    listContent: { paddingTop: 32, paddingBottom: 40 },
+    centerLoading: { marginTop: 100 },
 
-  // Sections
-  section: { backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#e9ecef' },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#495057', marginBottom: 8, marginLeft: 4, textTransform: 'uppercase' },
+    // --- Card ---
+    card: { 
+        backgroundColor: palette.surface, 
+        borderRadius: 16, 
+        padding: 20, 
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: palette.cardBorder,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    applicantName: { fontSize: 16, fontWeight: '800', color: palette.textPrimary },
+    jobTitle: { fontSize: 13, color: palette.accent, fontWeight: '600', marginTop: 2 },
+    
+    pendingBadge: { backgroundColor: palette.warningSoft, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
+    pendingText: { fontSize: 10, fontWeight: '800', color: palette.warning, letterSpacing: 0.5 },
+    
+    email: { color: palette.textSecondary, fontSize: 13, marginTop: 8, marginBottom: 16 },
+    
+    reviewBtn: {
+        backgroundColor: palette.textPrimary,
+        flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+        paddingVertical: 12, borderRadius: 10
+    },
+    reviewBtnText: { color: 'white', fontWeight: '700', fontSize: 13, marginRight: 8 },
 
-  // Profile Specifics
-  profileRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  avatarPlaceholder: { 
-      width: 50, height: 50, borderRadius: 25, backgroundColor: '#e2e6ea', 
-      justifyContent: 'center', alignItems: 'center', marginRight: 15 
-  },
-  avatarText: { fontSize: 22, fontWeight: 'bold', color: '#495057' },
-  profileName: { fontSize: 18, fontWeight: 'bold', color: '#212529' },
-  profileJob: { fontSize: 13, color: '#666' },
-  
-  infoGrid: { gap: 8 },
-  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { color: '#495057', fontSize: 14 },
+    // --- Empty State ---
+    emptyState: { alignItems: 'center', marginTop: 80 },
+    emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: palette.successSoft, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+    emptyTitle: { fontSize: 18, fontWeight: '800', color: palette.textPrimary },
+    emptySub: { fontSize: 14, color: palette.textSecondary, marginTop: 4 },
 
-  // Documents
-  docButton: { 
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
-      padding: 5 
-  },
-  docButtonText: { flex: 1, marginLeft: 10, fontSize: 14, fontWeight: '600', color: '#212529' },
+    // --- MODAL ---
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
+    modalContent: { 
+        backgroundColor: palette.background, 
+        borderTopLeftRadius: 24, borderTopRightRadius: 24, 
+        height: '85%', 
+        paddingBottom: 30
+    },
+    modalHeader: { 
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+        padding: 20, borderBottomWidth: 1, borderBottomColor: palette.cardBorder, backgroundColor: palette.surface,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24
+    },
+    modalTitle: { fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, color: palette.textPrimary },
+    modalScroll: { padding: 20 },
 
-  // Cover Letter
-  coverLetterText: { fontSize: 14, lineHeight: 22, color: '#495057' },
+    section: { backgroundColor: palette.surface, padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: palette.cardBorder },
+    sectionLabel: { fontSize: 12, fontWeight: '700', color: palette.textSecondary, marginBottom: 8, marginLeft: 4, letterSpacing: 0.5 },
 
-  // Modal Footer
-  modalFooter: { 
-      padding: 20, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#dee2e6' 
-  },
-  scheduleFullBtn: {
-      backgroundColor: '#fd7e14', // Orange
-      paddingVertical: 12, borderRadius: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-      marginBottom: 10, shadowColor: '#fd7e14', shadowOpacity: 0.2, shadowOffset: {width:0, height:2}
-  },
-  decisionRow: { flexDirection: 'row', gap: 10 },
-  decisionBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  acceptBtn: { backgroundColor: '#198754' }, // Green
-  rejectBtn: { backgroundColor: '#dc3545' }, // Red
-  footerBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+    // Profile
+    profileRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    avatarPlaceholder: { 
+        width: 50, height: 50, borderRadius: 16, backgroundColor: palette.background, 
+        justifyContent: 'center', alignItems: 'center', marginRight: 15, borderWidth: 1, borderColor: palette.cardBorder 
+    },
+    avatarText: { fontSize: 20, fontWeight: '800', color: palette.textPrimary },
+    profileName: { fontSize: 18, fontWeight: '800', color: palette.textPrimary },
+    profileJob: { fontSize: 13, color: palette.textSecondary },
+    
+    infoGrid: { gap: 10 },
+    infoItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    infoText: { color: palette.textPrimary, fontSize: 14, fontWeight: '500' },
 
+    // Docs
+    docButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    pdfIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: palette.dangerSoft, justifyContent: 'center', alignItems: 'center' },
+    docButtonText: { flex: 1, marginLeft: 12, fontSize: 14, fontWeight: '600', color: palette.textPrimary },
+
+    coverLetterText: { fontSize: 14, lineHeight: 24, color: palette.textPrimary },
+
+    // Footer
+    modalFooter: { padding: 20, backgroundColor: palette.surface, borderTopWidth: 1, borderTopColor: palette.cardBorder },
+    
+    scheduleFullBtn: {
+        backgroundColor: palette.accent, 
+        paddingVertical: 14, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+        marginBottom: 12
+    },
+    
+    decisionRow: { flexDirection: 'row', gap: 12 },
+    decisionBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+    
+    acceptBtn: { backgroundColor: palette.success, borderColor: palette.success },
+    rejectBtn: { backgroundColor: palette.background, borderColor: palette.danger },
+    
+    footerBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
 });
 
 export default AdminPending;

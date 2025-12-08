@@ -1,286 +1,357 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, Dimensions, Platform, StatusBar, RefreshControl, Alert } from 'react-native';
+import { 
+    View, 
+    Text, 
+    FlatList, 
+    TouchableOpacity, 
+    StyleSheet, 
+    ActivityIndicator, 
+    ImageBackground, 
+    Dimensions, 
+    Platform, 
+    StatusBar, 
+    RefreshControl, 
+    Alert,
+    useWindowDimensions
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
+// --- SHARED DESIGN PALETTE ---
+const palette = {
+    surface: "#FFFFFF",
+    background: "#F8FAFC",
+    textPrimary: "#1E293B",
+    textSecondary: "#64748B",
+    accent: "#3B82F6",
+    accentSoft: "rgba(59, 130, 246, 0.1)",
+    success: "#10B981",
+    successSoft: "#D1FAE5",
+    danger: "#EF4444",
+    dangerSoft: "#FEE2E2",
+    cardBorder: "#E2E8F0",
+    iconNeutral: "#94A3B8"
+};
+
 const CandidateDashboard = ({ route, navigation }) => {
-  // --- FIX START: Safe Parameter Handling ---
-  // 1. Get params safely (defaults to empty object if route.params is null)
-  const params = route.params || {};
+    const { width: screenWidth } = useWindowDimensions();
+    const isDesktop = screenWidth > 768;
 
-  // 2. Get user safely (defaults to "Candidate" if user is missing from params)
-  // This prevents crashes if other screens send back params without the user object
-  const user = params.user || { 
-      first_name: 'Candidate', 
-      id: 0 
-  };
-  // --- FIX END ---
-  
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  // State for Red Dot
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false); 
+    // --- 1. SAFE PARAMETER HANDLING ---
+    const params = route.params || {};
+    const user = params.user || { first_name: 'Candidate', id: 0 };
 
-  // 🌐 AUTO-DETECT URL
-  const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
+    // --- 2. STATE ---
+    const [jobs, setJobs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false); 
 
-  // Shared Background Image
-  const BACKGROUND_IMAGE_URL = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop&ixlib=rb-4.0.3';
+    // --- 3. CONFIG ---
+    const API_URL = Platform.OS === 'web' ? 'http://127.0.0.1:8000' : 'https://finalsbackendcampushire.onrender.com';
+    const HEADER_BG = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop';
 
-  // 1. Fetch Available Jobs
-  const fetchJobs = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/jobs/`);
-      setJobs(response.data);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    // --- API CALLS ---
+    const fetchJobs = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/api/jobs/`);
+            setJobs(response.data);
+        } catch (error) {
+            console.error("Error fetching jobs:", error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
 
-  // 2. UPDATED: Check for UNREAD Notifications
-  const checkNotifications = async () => {
-    if (!user || !user.id) return;
+    const checkNotifications = async () => {
+        if (!user || !user.id) return;
+        try {
+            const response = await axios.get(`${API_URL}/job/api/notifications/${user.id}/`);
+            const notifications = response.data || [];
+            // Check for unread
+            const unreadItems = notifications.filter(n => {
+                const isRead = (n.read !== undefined) ? n.read : (n.is_read !== undefined ? n.is_read : false);
+                return isRead === false;
+            });
+            setHasUnreadNotifications(unreadItems.length > 0);
+        } catch (error) {
+            console.error("Error checking notifications:", error);
+        }
+    };
 
-    try {
-      // Fetch the exact same list your Notifications screen uses
-      const response = await axios.get(`${API_URL}/job/api/notifications/${user.id}/`);
-      
-      const notifications = response.data || [];
+    useFocusEffect(
+        useCallback(() => {
+            fetchJobs();
+            checkNotifications(); 
+        }, [])
+    );
 
-      // Filter to find any that are NOT read
-      const unreadItems = notifications.filter(n => {
-        const isRead = (n.read !== undefined) ? n.read : (n.is_read !== undefined ? n.is_read : false);
-        return isRead === false;
-      });
+    const onRefresh = () => { 
+        setRefreshing(true); 
+        fetchJobs(); 
+        checkNotifications(); 
+    };
 
-      // If we have any unread items, show the dot
-      setHasUnreadNotifications(unreadItems.length > 0);
+    const handleApply = (item) => {
+        if (item.status !== 'Open') {
+            Alert.alert("Unavailable", "This job position is currently closed.");
+            return;
+        }
+        navigation.navigate('ApplyJob', { job: item, user });
+    };
 
-    } catch (error) {
-      console.error("Error checking notifications:", error);
-    }
-  };
+    // --- RENDER ITEMS ---
 
-  // Auto-load data when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      fetchJobs();
-      checkNotifications(); 
-    }, [])
-  );
+    const renderHeaderComponent = () => (
+        <View style={styles.bannerContainer}>
+            <View style={styles.bannerContent}>
+                <View>
+                    <Text style={styles.bannerTitle}>Find Your Dream Job</Text>
+                    <Text style={styles.bannerSub}>
+                        {jobs.length} open positions waiting for you.
+                    </Text>
+                </View>
+                <View style={styles.bannerIcon}>
+                    <Ionicons name="search" size={24} color={palette.accent} />
+                </View>
+            </View>
+        </View>
+    );
 
-  const onRefresh = () => { 
-      setRefreshing(true); 
-      fetchJobs(); 
-      checkNotifications(); 
-  };
+    const renderJobItem = ({ item }) => {
+        const isOpen = item.status === 'Open';
+        
+        return (
+            <View style={[styles.card, isDesktop && { width: '48%', marginRight: '2%' }]}>
+                {/* Header: Title & Status */}
+                <View style={styles.cardHeader}>
+                    <View style={{flex: 1}}>
+                        <Text style={styles.jobTitle}>{item.title}</Text>
+                        <Text style={styles.position}>{item.job_position}</Text>
+                    </View>
+                    <View style={[
+                        styles.badge, 
+                        { backgroundColor: isOpen ? palette.successSoft : palette.dangerSoft }
+                    ]}>
+                        <Text style={[
+                            styles.badgeText, 
+                            { color: isOpen ? palette.success : palette.danger }
+                        ]}>
+                            {item.status}
+                        </Text>
+                    </View>
+                </View>
 
-  const handleApply = (item) => {
-      if (item.status !== 'Open') {
-          Alert.alert("Unavailable", "This job position is currently closed.");
-          return;
-      }
-      navigation.navigate('ApplyJob', { job: item, user });
-  };
+                {/* Description */}
+                <Text style={styles.description} numberOfLines={3}>{item.description}</Text>
 
-  const renderJobItem = ({ item }) => {
-    const isOpen = item.status === 'Open';
-    const statusColor = isOpen ? '#198754' : '#dc3545';
+                {/* Meta Info */}
+                <View style={styles.metaRow}>
+                    <View style={styles.metaItem}>
+                        <Ionicons name="cash-outline" size={14} color={palette.textSecondary} />
+                        <Text style={styles.metaText}>${item.salary}</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                        <Ionicons name="people-outline" size={14} color={palette.textSecondary} />
+                        <Text style={styles.metaText}>{item.slots} Slots</Text>
+                    </View>
+                </View>
+
+                {/* Apply Button */}
+                <TouchableOpacity 
+                    style={[
+                        styles.applyButton, 
+                        !isOpen && styles.disabledButton
+                    ]}
+                    onPress={() => handleApply(item)}
+                    disabled={!isOpen}
+                    activeOpacity={0.9}
+                >
+                    <Text style={styles.applyButtonText}>
+                        {isOpen ? 'Apply Now' : 'Position Closed'}
+                    </Text>
+                    {isOpen && <Ionicons name="arrow-forward" size={16} color="white" style={{marginLeft: 6}}/>}
+                </TouchableOpacity>
+            </View>
+        );
+    };
 
     return (
-      <View style={[styles.card, { borderLeftColor: statusColor }]}>
-        <View style={styles.cardHeader}>
-          <View style={{flex: 1}}>
-            <Text style={styles.jobTitle}>{item.title}</Text>
-            <Text style={styles.position}>{item.job_position}</Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: isOpen ? '#d1e7dd' : '#f8d7da' }]}>
-            <Text style={[styles.badgeText, { color: statusColor }]}>{item.status}</Text>
-          </View>
-        </View>
-        
-        <Text style={styles.description} numberOfLines={3}>{item.description}</Text>
-        
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-             <Ionicons name="cash-outline" size={16} color="#555" />
-             <Text style={styles.metaText}>${item.salary}</Text>
-          </View>
-          <View style={styles.metaItem}>
-             <Ionicons name="people-outline" size={16} color="#555" />
-             <Text style={styles.metaText}>{item.slots} Slots</Text>
-          </View>
-        </View>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-        <TouchableOpacity 
-          style={[styles.applyButton, !isOpen && styles.disabledButton]}
-          onPress={() => handleApply(item)}
-          disabled={!isOpen}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.applyButtonText}>
-              {isOpen ? 'Apply Now' : 'Position Closed'}
-          </Text>
-          {isOpen && <Ionicons name="arrow-forward" size={16} color="white" style={{marginLeft: 5}}/>}
-        </TouchableOpacity>
-      </View>
-    );
-  };
+            {/* 1. Header Background */}
+            <ImageBackground source={{ uri: HEADER_BG }} style={styles.headerBackground}>
+                <View style={styles.headerOverlay}>
+                    <SafeAreaView edges={['top']} style={styles.safeArea}>
+                        {/* Navigation Bar */}
+                        <View style={[styles.topNav, { paddingHorizontal: isDesktop ? 32 : 24 }]}>
+                            
+                            {/* Left: Branding/Greeting */}
+                            <View>
+                                <Text style={styles.screenLabel}>CampusHire</Text>
+                                <Text style={styles.screenTitle}>Hello, {user.first_name}</Text>
+                            </View>
 
-  return (
-    <ImageBackground source={{ uri: BACKGROUND_IMAGE_URL }} style={styles.backgroundImage} resizeMode="cover">
-      <View style={styles.overlay}>
-        <StatusBar barStyle="light-content" />
-        
-        {/* Header */}
-        <View style={styles.header}>
-            <View>
-                <Text style={styles.logoText}>Campus Hire</Text>
-                <Text style={styles.welcomeText}>Hello, {user.first_name}!</Text>
-            </View>
-            <View style={styles.headerActions}>
-                
-                {/* --- NOTIFICATION BUTTON --- */}
-                <TouchableOpacity 
-                  style={[styles.iconBtn, { marginRight: 8, position: 'relative' }]} 
-                  onPress={() => {
-                      navigation.navigate('Notifications', { user });
-                  }}
-                >
-                    <Ionicons name="notifications" size={26} color="white" />
-                    
-                    {/* RED DOT: Only shows if hasUnreadNotifications is true */}
-                    {hasUnreadNotifications && (
-                        <View style={styles.notificationDot} />
-                    )}
-                </TouchableOpacity>
+                            {/* Right: Actions */}
+                            <View style={styles.headerActions}>
+                                {/* Notification with Red Dot */}
+                                <TouchableOpacity 
+                                    style={styles.iconBtn} 
+                                    onPress={() => navigation.navigate('Notifications', { user })}
+                                >
+                                    <Ionicons name="notifications-outline" size={24} color="#fff" />
+                                    {hasUnreadNotifications && <View style={styles.notificationDot} />}
+                                </TouchableOpacity>
 
-                {/* Profile Button */}
-                <TouchableOpacity 
-                    style={styles.iconBtn} 
-                    onPress={() => navigation.navigate('Profile', { user })}
-                >
-                    <Ionicons name="person-circle-outline" size={28} color="white" />
-                </TouchableOpacity>
+                                {/* Profile */}
+                                <TouchableOpacity 
+                                    style={styles.iconBtn} 
+                                    onPress={() => navigation.navigate('Profile', { user })}
+                                >
+                                    <Ionicons name="person-circle-outline" size={24} color="#fff" />
+                                </TouchableOpacity>
 
-                {/* Logout Button */}
-                <TouchableOpacity 
-                    style={[styles.iconBtn, {marginLeft: 8}]} 
-                    onPress={() => navigation.replace('Login')}
-                >
-                    <Ionicons name="log-out-outline" size={26} color="white" />
-                </TouchableOpacity>
-            </View>
-        </View>
-        
-        {/* Banner */}
-        <View style={styles.bannerContainer}>
-            <View style={styles.bannerGlass}>
-                <Text style={styles.bannerTitle}>Find Your Dream Job</Text>
-                <Text style={styles.bannerSub}>{jobs.length} open positions available for you.</Text>
-            </View>
-        </View>
-
-        {loading ? (
-           <View style={styles.centerLoading}><ActivityIndicator size="large" color="#ffffff" /></View>
-        ) : (
-          <FlatList
-            data={jobs}
-            renderItem={renderJobItem}
-            keyExtractor={item => item.id.toString()}
-            contentContainerStyle={styles.listContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
-            ListEmptyComponent={
-                <View style={styles.emptyState}>
-                    <Ionicons name="search" size={50} color="white" style={{opacity: 0.8}} />
-                    <Text style={{color: 'white', marginTop: 10, fontSize: 16}}>No jobs available right now.</Text>
+                                {/* Logout */}
+                                <TouchableOpacity 
+                                    style={[styles.iconBtn, {marginRight: 0}]} 
+                                    onPress={() => navigation.replace('Login')}
+                                >
+                                    <Ionicons name="log-out-outline" size={24} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </SafeAreaView>
                 </View>
-            }
-          />
-        )}
-      </View>
-    </ImageBackground>
-  );
+            </ImageBackground>
+
+            {/* 2. Floating Sheet Surface */}
+            <View style={styles.surface}>
+                {loading ? (
+                    <View style={styles.centerLoading}>
+                        <ActivityIndicator size="large" color={palette.accent} />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={jobs}
+                        renderItem={renderJobItem}
+                        keyExtractor={item => item.id.toString()}
+                        ListHeaderComponent={renderHeaderComponent}
+                        
+                        // Grid Logic
+                        numColumns={isDesktop ? 2 : 1}
+                        key={isDesktop ? 'h' : 'v'}
+                        
+                        contentContainerStyle={[
+                            styles.listContent,
+                            { paddingHorizontal: isDesktop ? 32 : 20 }
+                        ]}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <View style={styles.emptyIconCircle}>
+                                    <Ionicons name="search" size={40} color={palette.iconNeutral} />
+                                </View>
+                                <Text style={styles.emptyTitle}>No Jobs Found</Text>
+                                <Text style={styles.emptySub}>Check back later for new openings.</Text>
+                            </View>
+                        }
+                    />
+                )}
+            </View>
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
-  // Background & Layout
-  backgroundImage: { flex: 1, width: width, height: height },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  listContent: { padding: 20, paddingBottom: 40 },
-  centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+    container: { flex: 1, backgroundColor: palette.background },
 
-  // Header
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 45, paddingBottom: 15,
-  },
-  logoText: { fontSize: 22, fontWeight: '800', color: 'white' },
-  welcomeText: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
-  headerActions: { flexDirection: 'row', alignItems: 'center' },
-  iconBtn: { padding: 5 },
+    // --- Header ---
+    headerBackground: { height: height * 0.22, width: '100%' },
+    headerOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.9)' },
+    safeArea: { flex: 1 },
+    topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 15 },
+    
+    screenLabel: { color: palette.iconNeutral, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+    screenTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '800' },
+    
+    headerActions: { flexDirection: 'row', alignItems: 'center' },
+    iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginLeft: 12 },
 
-  // --- RED DOT STYLE ---
-  notificationDot: {
-    position: 'absolute',
-    top: 4,
-    right: 6,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#ff3b30', // System Red
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.1)',
-    zIndex: 10,
-  },
+    // Red Dot
+    notificationDot: {
+        position: 'absolute', top: 8, right: 8,
+        width: 8, height: 8, borderRadius: 4,
+        backgroundColor: palette.danger,
+        borderWidth: 1, borderColor: '#fff'
+    },
 
-  // Banner
-  bannerContainer: { paddingHorizontal: 20, marginBottom: 10 },
-  bannerGlass: {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)', padding: 20, borderRadius: 15,
-      borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)'
-  },
-  bannerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  bannerSub: { color: '#f0f0f0', marginTop: 5, fontSize: 13 },
+    // --- Surface ---
+    surface: { 
+        flex: 1, 
+        backgroundColor: palette.background, 
+        borderTopLeftRadius: 30, 
+        borderTopRightRadius: 30, 
+        marginTop: -30, 
+        overflow: 'hidden' 
+    },
+    listContent: { paddingTop: 32, paddingBottom: 40 },
+    centerLoading: { marginTop: 100 },
 
-  // Job Card
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 16, padding: 20, marginBottom: 20,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
-    borderLeftWidth: 5
-  },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  jobTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 2 },
-  position: { color: '#0d6efd', fontWeight: '600', fontSize: 14 },
-  
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
+    // --- Banner ---
+    bannerContainer: { marginBottom: 24 },
+    bannerContent: { 
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        backgroundColor: palette.accentSoft, padding: 20, borderRadius: 16,
+        borderWidth: 1, borderColor: palette.accentSoft
+    },
+    bannerTitle: { fontSize: 18, fontWeight: '800', color: palette.accent },
+    bannerSub: { fontSize: 13, color: palette.textSecondary, marginTop: 4 },
+    bannerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
 
-  description: { color: '#666', marginBottom: 15, lineHeight: 20, fontSize: 14 },
+    // --- Job Card ---
+    card: {
+        backgroundColor: palette.surface,
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
+        borderWidth: 1, borderColor: palette.cardBorder,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+    jobTitle: { fontSize: 16, fontWeight: '800', color: palette.textPrimary, marginBottom: 2 },
+    position: { color: palette.accent, fontWeight: '600', fontSize: 13 },
+    
+    badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  // Meta Data
-  metaRow: { flexDirection: 'row', marginBottom: 15, backgroundColor: '#f8f9fa', padding: 10, borderRadius: 10 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
-  metaText: { color: '#333', fontWeight: '600', marginLeft: 6, fontSize: 13 },
+    description: { color: palette.textSecondary, marginBottom: 16, lineHeight: 20, fontSize: 13 },
 
-  // Apply Button
-  applyButton: {
-    backgroundColor: '#0d6efd', padding: 14, borderRadius: 12,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#0d6efd', shadowOpacity: 0.3, shadowRadius: 5, elevation: 3
-  },
-  disabledButton: { backgroundColor: '#adb5bd', shadowOpacity: 0 },
-  applyButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+    // Meta
+    metaRow: { flexDirection: 'row', marginBottom: 16, gap: 12 },
+    metaItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: palette.background, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
+    metaText: { color: palette.textPrimary, fontWeight: '600', marginLeft: 6, fontSize: 12 },
+
+    // Apply Button
+    applyButton: {
+        backgroundColor: palette.accent, 
+        paddingVertical: 12, borderRadius: 12,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        shadowColor: palette.accent, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2
+    },
+    disabledButton: { backgroundColor: palette.iconNeutral, shadowOpacity: 0 },
+    applyButtonText: { color: 'white', fontWeight: '700', fontSize: 14 },
+
+    // Empty State
+    emptyState: { alignItems: 'center', marginTop: 40 },
+    emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+    emptyTitle: { fontSize: 18, fontWeight: '800', color: palette.textPrimary },
+    emptySub: { fontSize: 14, color: palette.textSecondary, marginTop: 4 },
 });
 
 export default CandidateDashboard;
