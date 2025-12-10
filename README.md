@@ -62,11 +62,9 @@ Physical Device: Open the Expo Go app and scan the QR code displayed in your ter
 Emulator: Press a in the terminal to run on Android Emulator, or i for iOS Simulator.
 
 🤝 Contributors
-heisenberg1122
-
-brad-git03
-
-NicoleAndreaBolus
+- github.com/heisenberg1122
+- github.combrad-git03
+- github.com/NicoleAndreaBolus
 
 License
 This project is for academic/final project purposes.
